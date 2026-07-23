@@ -1,37 +1,130 @@
 <!doctype html>
-<html lang="fr"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#b71c1c"><meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Réparations">
-<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="styles.css"><title>Suivi Réparations</title></head>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#123f52">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Justeau SAV">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="styles.css">
+<title>Justeau SAV</title>
+</head>
 <body>
-<header><div><h1>Suivi Réparations</h1><small>Atelier Justeau</small></div><button id="newBtn">＋ Nouvelle réparation</button></header>
+<header class="topbar">
+  <div>
+    <h1>Justeau SAV</h1>
+    <p>Suivi des réparations atelier</p>
+  </div>
+  <button class="icon-btn" id="menuBtn" aria-label="Menu">⋯</button>
+</header>
+
 <main>
-<div class="tools"><input id="search" type="search" placeholder="Rechercher : nom, société, matériel, n° de série…">
-<select id="filter"><option value="">Tous les statuts</option><option>Réceptionné</option><option>En attente de pièces</option><option>En attente de réponse de devis</option><option>HS</option><option>Terminé</option><option>Livré</option></select></div>
-<div id="summary" class="summary"></div><div id="list"></div><p id="empty" class="empty">Aucune réparation enregistrée.</p>
+  <section class="toolbar">
+    <input id="q" type="search" placeholder="Rechercher société, nom, matériel, série…">
+    <select id="statusFilter" aria-label="Filtrer par statut">
+      <option value="">Tous les statuts</option>
+      <option>En attente</option>
+      <option>En attente de devis</option>
+      <option>Pièce en commande</option>
+      <option>HS</option>
+      <option>Réparé</option>
+    </select>
+  </section>
+
+  <section class="stats">
+    <article><strong id="total">0</strong><span>Total</span></article>
+    <article><strong id="pending">0</strong><span>À traiter</span></article>
+    <article><strong id="repaired">0</strong><span>Réparés</span></article>
+  </section>
+
+  <section id="list" class="repair-list"></section>
 </main>
-<dialog id="formDialog"><form id="form">
-<div class="head"><h2 id="formTitle">Nouvelle réparation</h2><button type="button" id="closeForm" class="ghost">✕</button></div>
-<input type="hidden" id="id">
-<div class="grid">
-<label>Prénom<input id="firstName"></label><label>Nom<input id="lastName"></label>
-<label>Téléphone<input id="phone" type="tel"></label>
-<label>Société<select id="company"><option value="">Choisir</option><option>Justeau TP</option><option>Justeau Frères</option><option>SECA</option><option>SAS Havard</option></select></label>
-<label>Matériel<input id="equipment"></label><label>Marque<input id="brand"></label>
-<label>Modèle<input id="model"></label><label>N° de série<input id="serial"></label>
-<label>Date d'arrivée<input id="arrival" type="date"></label><label>Date de départ<input id="departure" type="date"></label>
-<label class="wide">Panne<textarea id="failure"></textarea></label>
-<label class="wide">Diagnostic<textarea id="diagnosis"></textarea></label>
-<label class="wide">Réparation effectuée<textarea id="repairDone"></textarea></label>
-<label class="wide">Pièces remplacées<textarea id="parts"></textarea></label>
-<label>Statut<select id="status"><option>Réceptionné</option><option>En attente de pièces</option><option>En attente de réponse de devis</option><option>HS</option><option>Terminé</option><option>Livré</option></select></label>
-<label>Photo<input id="photo" type="file" accept="image/*" capture="environment"></label>
-<div id="photoBox" class="wide hidden"><img id="photoPreview"><button type="button" id="removePhoto" class="secondary">Supprimer la photo</button></div>
-</div>
-<div class="actions"><button type="button" id="cancel" class="secondary">Annuler</button><button type="submit">Enregistrer</button></div>
-</form></dialog>
-<dialog id="detailDialog"><div id="detail"></div><div class="actions"><button id="edit">Modifier</button><button id="delete" class="danger">Supprimer</button><button id="closeDetail" class="secondary">Fermer</button></div></dialog>
-<footer><button id="export" class="secondary">Exporter une sauvegarde</button><label class="secondary upload">Importer une sauvegarde<input id="import" type="file" accept="application/json" hidden></label></footer>
-<script src="app.js"></script></body></html>
+
+<button id="newBtn" class="fab" aria-label="Nouvelle réparation">+</button>
+
+<dialog id="repairDialog">
+<form id="repairForm">
+  <div class="dialog-head">
+    <div>
+      <strong id="dialogTitle">Nouvelle réparation</strong>
+      <small id="repairNumber"></small>
+    </div>
+    <button type="button" class="ghost" id="closeDialog">Fermer</button>
+  </div>
+
+  <div class="dialog-body">
+    <input type="hidden" id="id">
+
+    <h2>Réception du matériel</h2>
+    <div class="grid">
+      <label>Société
+        <select id="company" required>
+          <option value="">Choisir une société</option>
+          <option>Justeau TP</option>
+          <option>Justeau Frères</option>
+          <option>SECA</option>
+          <option>SAS Havard</option>
+        </select>
+      </label>
+      <label>Prénom<input id="first" autocomplete="given-name"></label>
+      <label>Nom<input id="last" autocomplete="family-name"></label>
+      <label>Téléphone<input id="phone" type="tel" autocomplete="tel"></label>
+      <label class="wide">Matériel<input id="equipment" required></label>
+      <label>Marque<input id="brand"></label>
+      <label>Modèle<input id="model"></label>
+      <label class="wide">Numéro de série / parc<input id="serial"></label>
+      <label class="wide">Panne signalée<textarea id="fault" required></textarea></label>
+      <label>Date d’arrivée<input id="arrival" type="date" required></label>
+    </div>
+
+    <h2>Suivi de la réparation</h2>
+    <div class="grid">
+      <label class="wide">Diagnostic<textarea id="diagnostic"></textarea></label>
+      <label class="wide">Réparation effectuée<textarea id="repair"></textarea></label>
+      <label class="wide">Pièces remplacées<textarea id="parts"></textarea></label>
+      <label>Temps passé (heures)<input id="hours" type="number" min="0" step="0.25" inputmode="decimal"></label>
+      <label>Mécanicien
+        <select id="mechanic"><option>Gaetan</option></select>
+      </label>
+      <label>Statut
+        <select id="status" required>
+          <option>En attente</option>
+          <option>En attente de devis</option>
+          <option>Pièce en commande</option>
+          <option>HS</option>
+          <option>Réparé</option>
+        </select>
+      </label>
+      <label>Date de sortie<input id="departure" type="date"></label>
+      <label class="wide">Observations<textarea id="notes"></textarea></label>
+    </div>
+
+    <h2>Photos</h2>
+    <p class="help">Ajoutez plusieurs photos. Elles sont conservées sur cet appareil.</p>
+    <input id="photos" type="file" accept="image/*" capture="environment" multiple>
+    <div id="photoPreview" class="photo-grid"></div>
+  </div>
+
+  <div class="dialog-foot">
+    <button type="button" class="secondary" id="printBtn">Imprimer / PDF</button>
+    <button type="button" class="ghost" id="cancelBtn">Annuler</button>
+    <button type="submit" class="primary">Enregistrer</button>
+  </div>
+</form>
+</dialog>
+
+<dialog id="menuDialog" class="small-dialog">
+  <div class="dialog-head"><strong>Sauvegarde</strong><button class="ghost" id="closeMenu">Fermer</button></div>
+  <div class="menu-body">
+    <button class="secondary block" id="exportBtn">Exporter les données</button>
+    <label class="secondary block file-label">Importer une sauvegarde<input id="importFile" type="file" accept=".json,application/json"></label>
+    <p class="help">Faites régulièrement une exportation et conservez le fichier dans iCloud Drive.</p>
+  </div>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

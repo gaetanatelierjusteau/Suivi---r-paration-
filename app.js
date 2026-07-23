@@ -1,1 +1,147 @@
-const K='repairs_v1';let data=JSON.parse(localStorage.getItem(K)||'[]'),selected=null,photoData='';const $=x=>document.getElementById(x);function save(){localStorage.setItem(K,JSON.stringify(data))}function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}function date(v){return v?new Date(v+'T00:00:00').toLocaleDateString('fr-FR'):'—'}function render(){let q=$('search').value.toLowerCase(),f=$('filter').value;let rows=data.filter(r=>(!f||r.status===f)&&Object.values(r).join(' ').toLowerCase().includes(q)).sort((a,b)=>(b.arrival||'').localeCompare(a.arrival||''));$('list').innerHTML=rows.map(r=>`<div class="card" data-id="${r.id}"><div class="row"><div><b>${esc([r.equipment,r.brand,r.model].filter(Boolean).join(' — ')||'Matériel non renseigné')}</b><div class="muted">${esc([r.company,[r.firstName,r.lastName].filter(Boolean).join(' ')].filter(Boolean).join(' • '))}</div><div class="muted">N° série : ${esc(r.serial||'—')} • Arrivée : ${date(r.arrival)}</div></div><span class="badge">${esc(r.status||'Réceptionné')}</span></div></div>`).join('');$('empty').classList.toggle('hidden',rows.length>0);$('summary').innerHTML=`<div class="stat"><b>${data.length}</b>Total</div><div class="stat"><b>${data.filter(r=>r.status.includes('attente')).length}</b>En attente</div><div class="stat"><b>${data.filter(r=>r.status==='Terminé').length}</b>Terminées</div><div class="stat"><b>${data.filter(r=>r.status==='Livré').length}</b>Livrées</div>`;document.querySelectorAll('.card').forEach(c=>c.onclick=()=>openDetail(c.dataset.id))}function reset(){ $('form').reset();$('id').value='';$('arrival').value=new Date().toISOString().slice(0,10);$('status').value='Réceptionné';photoData='';preview()}function preview(){$('photoBox').classList.toggle('hidden',!photoData);$('photoPreview').src=photoData||''}function openNew(){reset();$('formTitle').textContent='Nouvelle réparation';$('formDialog').showModal()}function openEdit(id){let r=data.find(x=>x.id===id);if(!r)return;$('formTitle').textContent='Modifier la réparation';for(let k of ['id','firstName','lastName','phone','company','equipment','brand','model','serial','arrival','departure','failure','diagnosis','repairDone','parts','status'])$(k).value=r[k]||'';photoData=r.photo||'';preview();$('detailDialog').close();$('formDialog').showModal()}$('photo').onchange=e=>{let f=e.target.files[0];if(!f)return;if(f.size>4000000){alert('Photo trop lourde (4 Mo maximum).');return}let rd=new FileReader();rd.onload=()=>{photoData=rd.result;preview()};rd.readAsDataURL(f)};$('removePhoto').onclick=()=>{photoData='';$('photo').value='';preview()};$('form').onsubmit=e=>{e.preventDefault();let r={id:$('id').value||'R-'+Date.now(),photo:photoData,updated:Date.now()};for(let k of ['firstName','lastName','phone','company','equipment','brand','model','serial','arrival','departure','failure','diagnosis','repairDone','parts','status'])r[k]=$(k).value.trim();let i=data.findIndex(x=>x.id===r.id);i>=0?data[i]=r:data.push(r);save();$('formDialog').close();render()};function openDetail(id){selected=id;let r=data.find(x=>x.id===id),item=(l,v)=>`<div class="detailItem"><b>${l}</b>${esc(v||'—').replace(/\n/g,'<br>')}</div>`;$('detail').innerHTML=`<h2>${esc([r.equipment,r.brand,r.model].filter(Boolean).join(' — ')||'Réparation')}</h2>${r.photo?`<img class="detailPhoto" src="${r.photo}">`:''}<div class="detailGrid">${item('Client',[r.firstName,r.lastName].filter(Boolean).join(' '))}${item('Téléphone',r.phone)}${item('Société',r.company)}${item('N° de série',r.serial)}${item("Date d'arrivée",date(r.arrival))}${item('Date de départ',date(r.departure))}${item('Statut',r.status)}${item('Panne',r.failure)}${item('Diagnostic',r.diagnosis)}${item('Réparation effectuée',r.repairDone)}${item('Pièces remplacées',r.parts)}</div>`;$('detailDialog').showModal()}$('newBtn').onclick=openNew;$('closeForm').onclick=$('cancel').onclick=()=>$('formDialog').close();$('closeDetail').onclick=()=>$('detailDialog').close();$('edit').onclick=()=>openEdit(selected);$('delete').onclick=()=>{if(confirm('Supprimer cette réparation ?')){data=data.filter(r=>r.id!==selected);save();$('detailDialog').close();render()}};$('search').oninput=$('filter').onchange=render;$('export').onclick=()=>{let b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='sauvegarde-reparations.json';a.click()};$('import').onchange=async e=>{try{let d=JSON.parse(await e.target.files[0].text());if(Array.isArray(d)&&confirm('Remplacer les données actuelles ?')){data=d;save();render()}}catch{alert('Sauvegarde invalide')}};if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js');render();
+const OLD_KEY='justeau-sav-simple-v1';
+const DB_NAME='justeau-sav-v2';
+const STORE='repairs';
+const $=id=>document.getElementById(id);
+let db, data=[], currentPhotos=[];
+
+function openDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded=()=>req.result.createObjectStore(STORE,{keyPath:'id'});
+    req.onsuccess=()=>{db=req.result;resolve(db)};
+    req.onerror=()=>reject(req.error);
+  });
+}
+function tx(mode='readonly'){return db.transaction(STORE,mode).objectStore(STORE)}
+function getAll(){return new Promise((res,rej)=>{const r=tx().getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+function put(r){return new Promise((res,rej)=>{const q=tx('readwrite').put(r);q.onsuccess=()=>res();q.onerror=()=>rej(q.error)})}
+function remove(id){return new Promise((res,rej)=>{const q=tx('readwrite').delete(id);q.onsuccess=()=>res();q.onerror=()=>rej(q.error)})}
+function clearStore(){return new Promise((res,rej)=>{const q=tx('readwrite').clear();q.onsuccess=()=>res();q.onerror=()=>rej(q.error)})}
+
+function repairNum(r){return 'R-'+String(r.seq||0).padStart(6,'0')}
+function slug(s){return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function frDate(v){if(!v)return '';const [y,m,d]=v.split('-');return `${d}/${m}/${y}`}
+
+async function migrate(){
+  const old=JSON.parse(localStorage.getItem(OLD_KEY)||'[]');
+  if(!old.length || (await getAll()).length) return;
+  for(const r of old){
+    await put({...r,mechanic:r.mechanic||'Gaetan',status:mapOldStatus(r.status),photos:r.photos||[]});
+  }
+}
+function mapOldStatus(s){
+  if(['Terminé','Restitué'].includes(s))return 'Réparé';
+  if(s==='Attente pièces')return 'Pièce en commande';
+  return 'En attente';
+}
+async function reload(){data=await getAll();render()}
+
+function render(){
+  const query=$('q').value.trim().toLowerCase();
+  const filter=$('statusFilter').value;
+  const rows=[...data]
+    .filter(r=>!filter||r.status===filter)
+    .filter(r=>JSON.stringify({...r,photos:[]}).toLowerCase().includes(query))
+    .sort((a,b)=>(b.arrival||'').localeCompare(a.arrival||'')||(b.seq||0)-(a.seq||0));
+
+  $('total').textContent=data.length;
+  $('pending').textContent=data.filter(r=>r.status!=='Réparé'&&r.status!=='HS').length;
+  $('repaired').textContent=data.filter(r=>r.status==='Réparé').length;
+
+  $('list').innerHTML=rows.length?rows.map(r=>`
+    <article class="card status-${slug(r.status)}">
+      <div class="card-top">
+        <div>
+          <div class="number">${repairNum(r)}</div>
+          <h3>${esc(r.equipment||'Matériel non renseigné')}</h3>
+        </div>
+        <span class="badge">${esc(r.status)}</span>
+      </div>
+      <div class="meta">${esc(r.company)}${r.arrival?' · arrivée '+frDate(r.arrival):''}</div>
+      <div class="meta">${esc([r.first,r.last].filter(Boolean).join(' '))}${r.serial?' · série/parc '+esc(r.serial):''}</div>
+      <div class="fault"><strong>Panne :</strong> ${esc(r.fault||'—')}</div>
+      <div class="actions">
+        <button class="secondary" onclick="editRepair('${r.id}')">Ouvrir / modifier</button>
+        <button class="ghost" onclick="printRepair('${r.id}')">Fiche PDF</button>
+        <button class="danger" onclick="deleteRepair('${r.id}')">Supprimer</button>
+      </div>
+    </article>`).join(''):'<div class="empty">Aucune réparation trouvée.</div>';
+}
+function resetForm(){
+  $('repairForm').reset();$('id').value='';$('arrival').value=new Date().toISOString().slice(0,10);
+  $('status').value='En attente';$('mechanic').value='Gaetan';currentPhotos=[];renderPhotos();
+}
+function newRepair(){
+  resetForm();$('dialogTitle').textContent='Nouvelle réparation';$('repairNumber').textContent='Numéro attribué à l’enregistrement';
+  $('repairDialog').showModal();
+}
+function fillForm(r){
+  const keys=['id','company','first','last','phone','equipment','brand','model','serial','fault','arrival','diagnostic','repair','parts','hours','mechanic','status','departure','notes'];
+  keys.forEach(k=>$(k).value=r[k]||'');
+  currentPhotos=[...(r.photos||[])];renderPhotos();
+}
+window.editRepair=id=>{
+  const r=data.find(x=>x.id===id);if(!r)return;
+  fillForm(r);$('dialogTitle').textContent='Fiche de réparation';$('repairNumber').textContent=repairNum(r);$('repairDialog').showModal();
+}
+window.deleteRepair=async id=>{
+  if(confirm('Supprimer définitivement cette réparation ?')){await remove(id);await reload()}
+}
+window.printRepair=id=>{editRepair(id);setTimeout(()=>window.print(),250)}
+
+function renderPhotos(){
+  $('photoPreview').innerHTML=currentPhotos.map((src,i)=>`<div class="photo-item"><img src="${src}" alt="Photo réparation"><button type="button" onclick="removePhoto(${i})">×</button></div>`).join('');
+}
+window.removePhoto=i=>{currentPhotos.splice(i,1);renderPhotos()}
+function compressImage(file){
+  return new Promise((resolve,reject)=>{
+    const img=new Image(), reader=new FileReader();
+    reader.onload=()=>img.src=reader.result;reader.onerror=reject;
+    img.onload=()=>{
+      const max=1400, scale=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement('canvas');c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',.76));
+    };img.onerror=reject;reader.readAsDataURL(file);
+  });
+}
+$('photos').addEventListener('change',async e=>{
+  for(const f of [...e.target.files]) currentPhotos.push(await compressImage(f));
+  e.target.value='';renderPhotos();
+});
+
+$('repairForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const rid=$('id').value||crypto.randomUUID();
+  const old=data.find(x=>x.id===rid);
+  const nextSeq=old?.seq||Math.max(0,...data.map(x=>Number(x.seq)||0))+1;
+  const keys=['company','first','last','phone','equipment','brand','model','serial','fault','arrival','diagnostic','repair','parts','hours','mechanic','status','departure','notes'];
+  const r={id:rid,seq:nextSeq,photos:currentPhotos,updatedAt:new Date().toISOString()};
+  keys.forEach(k=>r[k]=$(k).value.trim?.()??$(k).value);
+  await put(r);$('repairDialog').close();await reload();
+});
+$('printBtn').onclick=()=>window.print();
+$('newBtn').onclick=newRepair;
+$('closeDialog').onclick=$('cancelBtn').onclick=()=>$('repairDialog').close();
+$('q').addEventListener('input',render);$('statusFilter').addEventListener('change',render);
+
+$('menuBtn').onclick=()=>$('menuDialog').showModal();
+$('closeMenu').onclick=()=>$('menuDialog').close();
+$('exportBtn').onclick=()=>{
+  const blob=new Blob([JSON.stringify({version:2,exportedAt:new Date().toISOString(),repairs:data},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`sauvegarde-justeau-sav-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);
+};
+$('importFile').addEventListener('change',async e=>{
+  try{
+    const obj=JSON.parse(await e.target.files[0].text()), rows=Array.isArray(obj)?obj:obj.repairs;
+    if(!Array.isArray(rows))throw new Error();
+    if(!confirm(`Importer ${rows.length} réparation(s) ? Les données actuelles seront remplacées.`))return;
+    await clearStore();for(const r of rows)await put(r);await reload();$('menuDialog').close();
+  }catch{alert('Ce fichier de sauvegarde n’est pas valide.')}
+  e.target.value='';
+});
+
+(async()=>{
+  await openDB();await migrate();await reload();
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
+})();

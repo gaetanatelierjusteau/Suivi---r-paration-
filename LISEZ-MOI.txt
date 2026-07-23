@@ -1,4 +1,25 @@
-Application personnelle de suivi des réparations.
-Fonctions : ajout, modification, suppression, recherche, filtres, photos, sauvegarde/restauration.
-Pour l'installer sur iPhone/iPad, publier ce dossier sur un hébergement HTTPS gratuit, puis ouvrir le lien dans Safari > Partager > Sur l'écran d'accueil.
-Les données restent uniquement sur l'appareil. Exportez régulièrement une sauvegarde JSON.
+JUSTEAU SAV — VERSION 2
+
+FICHIERS À METTRE SUR GITHUB
+Remplacez les anciens fichiers du dépôt par tous les fichiers de ce dossier :
+- index.html
+- styles.css
+- app.js
+- manifest.webmanifest
+- service-worker.js
+- icon-192.png
+- icon-512.png
+
+IMPORTANT
+1. Ne supprimez pas vos anciennes données avant la mise à jour.
+2. La Version 2 récupère automatiquement les données de la Version 1 sur le même appareil et le même lien GitHub Pages.
+3. Après remplacement des fichiers, attendez environ 1 à 3 minutes.
+4. Ouvrez l’application dans Safari et actualisez la page.
+5. Si l’ancienne version apparaît encore, fermez complètement Safari puis rouvrez-la.
+
+INSTALLATION SUR IPHONE
+Safari > bouton Partager > Sur l’écran d’accueil.
+
+SAUVEGARDE
+Dans l’application : bouton ⋯ > Exporter les données.
+Conservez régulièrement le fichier JSON dans iCloud Drive.
