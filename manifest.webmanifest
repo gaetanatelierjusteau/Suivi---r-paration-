@@ -1,7 +1,7 @@
 {
   "name": "Justeau SAV — Suivi des réparations",
   "short_name": "Justeau SAV",
-  "start_url": "./",
+  "start_url": "./?v=3",
   "display": "standalone",
   "background_color": "#eef2f5",
   "theme_color": "#123f52",

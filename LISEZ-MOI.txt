@@ -1,25 +1,37 @@
-JUSTEAU SAV — VERSION 2
+JUSTEAU SAV — VERSION 3
 
-FICHIERS À METTRE SUR GITHUB
-Remplacez les anciens fichiers du dépôt par tous les fichiers de ce dossier :
-- index.html
-- styles.css
-- app.js
-- manifest.webmanifest
-- service-worker.js
-- icon-192.png
-- icon-512.png
+NOUVEAUTÉ PRINCIPALE
+Un bouton « Récap mensuel » permet de choisir :
+- la société ;
+- le mois ;
+- éventuellement le taux horaire HT.
+
+Le rapport calcule :
+- le nombre d’interventions ;
+- le total des heures ;
+- le montant total des pièces HT ;
+- le montant de main-d’œuvre HT si le taux horaire est renseigné ;
+- le total à reprendre pour la facturation.
+
+Le rapport peut être :
+- imprimé ou enregistré en PDF ;
+- exporté au format CSV pour la comptabilité.
+
+MISE À JOUR SUR GITHUB
+1. Décompressez Justeau_SAV_Version_3.zip.
+2. Dans le dépôt GitHub : Add file > Upload files.
+3. Sélectionnez les 7 fichiers techniques :
+   index.html, app.js, styles.css, manifest.webmanifest,
+   service-worker.js, icon-192.png et icon-512.png.
+4. Validez avec Commit changes.
+5. Attendez 1 à 3 minutes.
+6. Ouvrez l’application dans Safari avec ?v=3 à la fin de l’adresse.
+7. Fermez puis rouvrez l’icône de l’application si l’ancienne version reste affichée.
+
+DONNÉES
+La Version 3 utilise la même base locale que la Version 2.
+Les réparations déjà enregistrées sur le même appareil et la même adresse sont conservées.
 
 IMPORTANT
-1. Ne supprimez pas vos anciennes données avant la mise à jour.
-2. La Version 2 récupère automatiquement les données de la Version 1 sur le même appareil et le même lien GitHub Pages.
-3. Après remplacement des fichiers, attendez environ 1 à 3 minutes.
-4. Ouvrez l’application dans Safari et actualisez la page.
-5. Si l’ancienne version apparaît encore, fermez complètement Safari puis rouvrez-la.
-
-INSTALLATION SUR IPHONE
-Safari > bouton Partager > Sur l’écran d’accueil.
-
-SAUVEGARDE
-Dans l’application : bouton ⋯ > Exporter les données.
-Conservez régulièrement le fichier JSON dans iCloud Drive.
+Les données de l’iPhone et de l’iPad ne se synchronisent pas automatiquement.
+Faites régulièrement : menu ⋯ > Exporter les données.

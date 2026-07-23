@@ -18,7 +18,10 @@
     <h1>Justeau SAV</h1>
     <p>Suivi des réparations atelier</p>
   </div>
-  <button class="icon-btn" id="menuBtn" aria-label="Menu">⋯</button>
+  <div class="top-actions">
+    <button class="header-btn" id="reportBtn">Récap mensuel</button>
+    <button class="icon-btn" id="menuBtn" aria-label="Menu">⋯</button>
+  </div>
 </header>
 
 <main>
@@ -84,7 +87,8 @@
     <div class="grid">
       <label class="wide">Diagnostic<textarea id="diagnostic"></textarea></label>
       <label class="wide">Réparation effectuée<textarea id="repair"></textarea></label>
-      <label class="wide">Pièces remplacées<textarea id="parts"></textarea></label>
+      <label class="wide">Pièces remplacées / commandées<textarea id="parts" placeholder="Ex. 1 filtre à huile, 2 courroies…"></textarea></label>
+      <label>Montant total des pièces HT (€)<input id="partsCost" type="number" min="0" step="0.01" inputmode="decimal"></label>
       <label>Temps passé (heures)<input id="hours" type="number" min="0" step="0.25" inputmode="decimal"></label>
       <label>Mécanicien
         <select id="mechanic"><option>Gaetan</option></select>
@@ -114,6 +118,67 @@
     <button type="submit" class="primary">Enregistrer</button>
   </div>
 </form>
+</dialog>
+
+<dialog id="reportDialog" class="report-dialog">
+  <div class="dialog-head">
+    <div>
+      <strong>Récapitulatif mensuel</strong>
+      <small>Heures et pièces par société</small>
+    </div>
+    <button class="ghost" id="closeReport">Fermer</button>
+  </div>
+
+  <div class="dialog-body report-body">
+    <div class="report-filters">
+      <label>Société
+        <select id="reportCompany">
+          <option>Justeau TP</option>
+          <option>Justeau Frères</option>
+          <option>SECA</option>
+          <option>SAS Havard</option>
+        </select>
+      </label>
+      <label>Mois<input id="reportMonth" type="month"></label>
+      <label>Taux horaire HT (€)<input id="hourlyRate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Facultatif"></label>
+    </div>
+
+    <section id="reportPrintArea">
+      <div class="report-title">
+        <h2 id="reportHeading">Récapitulatif mensuel</h2>
+        <p>Atelier réparateur : Justeau TP</p>
+      </div>
+
+      <div class="report-summary">
+        <article><span>Total interventions</span><strong id="reportCount">0</strong></article>
+        <article><span>Total heures</span><strong id="reportHours">0 h</strong></article>
+        <article><span>Pièces HT</span><strong id="reportPartsCost">0,00 €</strong></article>
+        <article><span>Main-d’œuvre HT</span><strong id="reportLaborCost">—</strong></article>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>N°</th><th>Date</th><th>Matériel</th><th>Série / parc</th>
+              <th>Travaux</th><th>Pièces</th><th>Heures</th><th>Pièces HT</th>
+            </tr>
+          </thead>
+          <tbody id="reportRows"></tbody>
+        </table>
+      </div>
+
+      <div class="report-total" id="grandTotalBox">
+        <span>Total à reprendre pour la facturation</span>
+        <strong id="grandTotal">—</strong>
+      </div>
+    </section>
+  </div>
+
+  <div class="dialog-foot">
+    <button class="secondary" id="exportCsvBtn">Exporter CSV</button>
+    <button class="primary" id="printReportBtn">Imprimer / PDF</button>
+  </div>
 </dialog>
 
 <dialog id="menuDialog" class="small-dialog">

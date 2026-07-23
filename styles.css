@@ -8,6 +8,8 @@ button,input,select,textarea{font:inherit}
 button{cursor:pointer}
 .topbar{position:sticky;top:0;z-index:10;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding:17px max(16px,env(safe-area-inset-right)) 14px max(16px,env(safe-area-inset-left));display:flex;align-items:center;justify-content:space-between;box-shadow:0 3px 12px rgba(0,0,0,.15)}
 .topbar h1{margin:0;font-size:25px}.topbar p{margin:3px 0 0;opacity:.9;font-size:14px}
+.top-actions{display:flex;gap:8px;align-items:center}
+.header-btn{border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.14);color:#fff;padding:10px 12px}
 .icon-btn{width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;font-size:25px}
 main{max-width:1000px;margin:auto;padding:14px 14px 96px}
 .toolbar{display:grid;grid-template-columns:1fr 220px;gap:9px}
@@ -37,21 +39,43 @@ dialog::backdrop{background:rgba(10,20,30,.55)}
 .dialog-head{top:0;border-bottom:1px solid var(--line)}.dialog-foot{bottom:0;border-top:1px solid var(--line);justify-content:flex-end;flex-wrap:wrap}
 .dialog-head strong{font-size:18px}.dialog-head small{display:block;color:var(--muted);margin-top:2px}
 .dialog-body{padding:16px}.dialog-body h2{font-size:16px;color:var(--brand);margin:7px 0 12px;border-bottom:1px solid var(--line);padding-bottom:7px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.grid label{font-size:13px;font-weight:750}.grid label input,.grid label select,.grid label textarea{margin-top:6px;font-weight:400}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.grid label,.report-filters label{font-size:13px;font-weight:750}.grid label input,.grid label select,.grid label textarea,.report-filters input,.report-filters select{margin-top:6px;font-weight:400}
 .wide{grid-column:1/-1}.help{color:var(--muted);font-size:13px}
 .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .photo-item{position:relative}.photo-item img{width:100%;height:135px;object-fit:cover;border-radius:12px;border:1px solid var(--line)}
 .photo-item button{position:absolute;top:5px;right:5px;padding:5px 8px;border-radius:50%;background:rgba(0,0,0,.65);color:#fff}
 .small-dialog{width:min(440px,calc(100% - 24px))}.menu-body{padding:16px}.block{display:block;width:100%;margin-bottom:10px}.file-label input{display:none}
 .empty{text-align:center;background:#fff;color:var(--muted);border-radius:16px;padding:36px 18px;box-shadow:var(--shadow)}
+.report-dialog{width:min(1180px,calc(100% - 18px))}
+.report-filters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px}
+.report-title h2{margin:0;color:var(--brand)}.report-title p{margin:4px 0 14px;color:var(--muted)}
+.report-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:14px}
+.report-summary article{border:1px solid var(--line);border-radius:13px;padding:11px;background:#fafcfd}
+.report-summary span{display:block;color:var(--muted);font-size:12px}.report-summary strong{display:block;margin-top:4px;font-size:19px}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;min-width:980px}
+th,td{padding:9px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left;font-size:12px}
+th{background:#f4f7f9;color:var(--brand);position:sticky;top:0}
+.report-total{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:14px;border-radius:12px;background:#e8f3f6}
+.report-total strong{font-size:22px;color:var(--brand)}
 @media(max-width:680px){
-  .toolbar{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.wide{grid-column:auto}
+  .toolbar,.grid,.report-filters{grid-template-columns:1fr}.wide{grid-column:auto}
   .photo-grid{grid-template-columns:repeat(2,1fr)}
   .dialog-foot button{flex:1}.stats article{padding:11px}.stats strong{font-size:20px}
+  .header-btn{font-size:12px;padding:9px}.report-summary{grid-template-columns:1fr 1fr}
 }
 @media print{
-  body{background:#fff}.topbar,main,.fab,#menuDialog,.dialog-head,.dialog-foot{display:none!important}
-  #repairDialog{display:block;position:static;width:100%;max-height:none;box-shadow:none;border-radius:0}
-  #repairDialog::backdrop{display:none}.dialog-body{padding:0}.dialog-body h2{margin-top:18px}
-  input,select,textarea{border:0;padding:3px 0;appearance:none}.photo-item button,#photos,.help{display:none}
+  body{background:#fff}
+  body.print-repair .topbar,body.print-repair main,body.print-repair .fab,body.print-repair #menuDialog,body.print-repair #reportDialog,body.print-repair .dialog-head,body.print-repair .dialog-foot{display:none!important}
+  body.print-repair #repairDialog{display:block;position:static;width:100%;max-height:none;box-shadow:none;border-radius:0}
+  body.print-repair #repairDialog::backdrop{display:none}
+  body.print-repair .dialog-body{padding:0}
+  body.print-repair input,body.print-repair select,body.print-repair textarea{border:0;padding:3px 0;appearance:none}
+  body.print-repair .photo-item button,body.print-repair #photos,body.print-repair .help{display:none}
+  body.print-report .topbar,body.print-report main,body.print-report .fab,body.print-report #menuDialog,body.print-report #repairDialog,body.print-report .dialog-head,body.print-report .dialog-foot,body.print-report .report-filters{display:none!important}
+  body.print-report #reportDialog{display:block;position:static;width:100%;max-height:none;box-shadow:none;border-radius:0}
+  body.print-report #reportDialog::backdrop{display:none}
+  body.print-report .dialog-body{padding:0}
+  body.print-report table{min-width:0}
+  body.print-report th,body.print-report td{font-size:9px;padding:5px}
 }
