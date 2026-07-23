@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#123f52">
+<meta name="theme-color" content="#b5121b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Justeau SAV">
@@ -21,6 +21,7 @@
   <div class="top-actions">
     <button class="header-btn" id="ordersBtn">Commandes</button>
     <button class="header-btn" id="reportBtn">Récap mensuel</button>
+    <button class="header-btn share-header" id="shareBtn">Partager</button>
     <button class="icon-btn" id="menuBtn" aria-label="Menu">⋯</button>
   </div>
 </header>
@@ -43,6 +44,18 @@
     <article><strong id="pending">0</strong><span>À traiter</span></article>
     <article><strong id="orderedPartsCount">0</strong><span>Commandes ouvertes</span></article>
     <article><strong id="repaired">0</strong><span>Réparés</span></article>
+  </section>
+
+  <section class="dashboard-panel" aria-label="Priorités atelier">
+    <div class="dashboard-head">
+      <div><strong>Priorités atelier</strong><span>Les dossiers qui demandent votre attention</span></div>
+      <span class="version-badge">Version 5</span>
+    </div>
+    <div class="priority-grid">
+      <button type="button" class="priority-card" id="lateRepairsBtn"><strong id="lateRepairsCount">0</strong><span>Réparations de plus de 15 jours</span></button>
+      <button type="button" class="priority-card" id="lateOrdersBtn"><strong id="lateOrdersCount">0</strong><span>Commandes ouvertes depuis plus de 7 jours</span></button>
+      <button type="button" class="priority-card" id="noDiagnosisBtn"><strong id="noDiagnosisCount">0</strong><span>Dossiers sans diagnostic</span></button>
+    </div>
   </section>
 
   <section id="list" class="repair-list"></section>
@@ -222,11 +235,12 @@
 </dialog>
 
 <dialog id="menuDialog" class="small-dialog">
-  <div class="dialog-head"><strong>Sauvegarde</strong><button class="ghost" id="closeMenu">Fermer</button></div>
+  <div class="dialog-head"><strong>Outils Justeau SAV</strong><button class="ghost" id="closeMenu">Fermer</button></div>
   <div class="menu-body">
+    <button class="primary block" id="shareMenuBtn">Partager l’application</button>
     <button class="secondary block" id="exportBtn">Exporter les données</button>
     <label class="secondary block file-label">Importer une sauvegarde<input id="importFile" type="file" accept=".json,application/json"></label>
-    <p class="help">Faites régulièrement une exportation et conservez le fichier dans iCloud Drive.</p>
+    <p class="help">Faites régulièrement une exportation et conservez le fichier dans iCloud Drive ou Google Drive.</p>
   </div>
 </dialog>
 
