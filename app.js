@@ -1,217 +1,49 @@
-const OLD_KEY='justeau-sav-simple-v1';
-const DB_NAME='justeau-sav-v2';
-const STORE='repairs';
-const $=id=>document.getElementById(id);
-let db, data=[], currentPhotos=[];
-
-function openDB(){
-  return new Promise((resolve,reject)=>{
-    const req=indexedDB.open(DB_NAME,1);
-    req.onupgradeneeded=()=>req.result.createObjectStore(STORE,{keyPath:'id'});
-    req.onsuccess=()=>{db=req.result;resolve(db)};
-    req.onerror=()=>reject(req.error);
-  });
-}
-function tx(mode='readonly'){return db.transaction(STORE,mode).objectStore(STORE)}
+const OLD_KEY='justeau-sav-simple-v1',DB_NAME='justeau-sav-v2',STORE='repairs';
+const $=id=>document.getElementById(id);let db,data=[],currentPhotos=[],currentOrders=[];
+function openDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE,{keyPath:'id'});r.onsuccess=()=>{db=r.result;resolve()};r.onerror=()=>reject(r.error)})}
+function tx(m='readonly'){return db.transaction(STORE,m).objectStore(STORE)}
 function getAll(){return new Promise((res,rej)=>{const r=tx().getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-function put(r){return new Promise((res,rej)=>{const q=tx('readwrite').put(r);q.onsuccess=()=>res();q.onerror=()=>rej(q.error)})}
-function remove(id){return new Promise((res,rej)=>{const q=tx('readwrite').delete(id);q.onsuccess=()=>res();q.onerror=()=>rej(q.error)})}
-function clearStore(){return new Promise((res,rej)=>{const q=tx('readwrite').clear();q.onsuccess=()=>res();q.onerror=()=>rej(q.error)})}
-
-function repairNum(r){return 'R-'+String(r.seq||0).padStart(6,'0')}
-function slug(s){return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
+function put(v){return new Promise((res,rej)=>{const r=tx('readwrite').put(v);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
+function remove(id){return new Promise((res,rej)=>{const r=tx('readwrite').delete(id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
+function clearStore(){return new Promise((res,rej)=>{const r=tx('readwrite').clear();r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
+function num(r){return'R-'+String(r.seq||0).padStart(6,'0')}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function frDate(v){if(!v)return '';const [y,m,d]=v.split('-');return `${d}/${m}/${y}`}
-function money(v){return (Number(v)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
-function hoursLabel(v){
-  const n=Number(v)||0, h=Math.floor(n), m=Math.round((n-h)*60);
-  return `${h} h${m?` ${String(m).padStart(2,'0')}`:''}`;
-}
-
-async function migrate(){
-  const old=JSON.parse(localStorage.getItem(OLD_KEY)||'[]');
-  if(!old.length || (await getAll()).length) return;
-  for(const r of old){
-    await put({...r,mechanic:r.mechanic||'Gaetan',status:mapOldStatus(r.status),photos:r.photos||[],partsCost:r.partsCost||''});
-  }
-}
-function mapOldStatus(s){
-  if(['Terminé','Restitué'].includes(s))return 'Réparé';
-  if(s==='Attente pièces')return 'Pièce en commande';
-  return 'En attente';
-}
-async function reload(){data=await getAll();render()}
-
-function render(){
-  const query=$('q').value.trim().toLowerCase();
-  const filter=$('statusFilter').value;
-  const rows=[...data]
-    .filter(r=>!filter||r.status===filter)
-    .filter(r=>JSON.stringify({...r,photos:[]}).toLowerCase().includes(query))
-    .sort((a,b)=>(b.arrival||'').localeCompare(a.arrival||'')||(b.seq||0)-(a.seq||0));
-
-  $('total').textContent=data.length;
-  $('pending').textContent=data.filter(r=>r.status!=='Réparé'&&r.status!=='HS').length;
-  $('repaired').textContent=data.filter(r=>r.status==='Réparé').length;
-
-  $('list').innerHTML=rows.length?rows.map(r=>`
-    <article class="card status-${slug(r.status)}">
-      <div class="card-top">
-        <div>
-          <div class="number">${repairNum(r)}</div>
-          <h3>${esc(r.equipment||'Matériel non renseigné')}</h3>
-        </div>
-        <span class="badge">${esc(r.status)}</span>
-      </div>
-      <div class="meta">${esc(r.company)}${r.arrival?' · arrivée '+frDate(r.arrival):''}</div>
-      <div class="meta">${esc([r.first,r.last].filter(Boolean).join(' '))}${r.serial?' · série/parc '+esc(r.serial):''}</div>
-      <div class="fault"><strong>Panne :</strong> ${esc(r.fault||'—')}</div>
-      <div class="meta">${r.hours?`Temps : ${hoursLabel(r.hours)}`:''}${r.partsCost?` · Pièces HT : ${money(r.partsCost)}`:''}</div>
-      <div class="actions">
-        <button class="secondary" onclick="editRepair('${r.id}')">Ouvrir / modifier</button>
-        <button class="ghost" onclick="printRepair('${r.id}')">Fiche PDF</button>
-        <button class="danger" onclick="deleteRepair('${r.id}')">Supprimer</button>
-      </div>
-    </article>`).join(''):'<div class="empty">Aucune réparation trouvée.</div>';
-}
-function resetForm(){
-  $('repairForm').reset();$('id').value='';$('arrival').value=new Date().toISOString().slice(0,10);
-  $('status').value='En attente';$('mechanic').value='Gaetan';currentPhotos=[];renderPhotos();
-}
-function newRepair(){
-  resetForm();$('dialogTitle').textContent='Nouvelle réparation';$('repairNumber').textContent='Numéro attribué à l’enregistrement';
-  $('repairDialog').showModal();
-}
-function fillForm(r){
-  const keys=['id','company','first','last','phone','equipment','brand','model','serial','fault','arrival','diagnostic','repair','parts','partsCost','hours','mechanic','status','departure','notes'];
-  keys.forEach(k=>$(k).value=r[k]||'');
-  currentPhotos=[...(r.photos||[])];renderPhotos();
-}
-window.editRepair=id=>{
-  const r=data.find(x=>x.id===id);if(!r)return;
-  fillForm(r);$('dialogTitle').textContent='Fiche de réparation';$('repairNumber').textContent=repairNum(r);$('repairDialog').showModal();
-}
-window.deleteRepair=async id=>{
-  if(confirm('Supprimer définitivement cette réparation ?')){await remove(id);await reload()}
-}
-window.printRepair=id=>{
-  editRepair(id);
-  document.body.classList.add('print-repair');
-  setTimeout(()=>window.print(),250);
-}
-
-function renderPhotos(){
-  $('photoPreview').innerHTML=currentPhotos.map((src,i)=>`<div class="photo-item"><img src="${src}" alt="Photo réparation"><button type="button" onclick="removePhoto(${i})">×</button></div>`).join('');
-}
+function slug(s){return(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
+function frDate(v){if(!v)return'';const[y,m,d]=v.split('-');return`${d}/${m}/${y}`}
+function money(v){return(Number(v)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
+function hours(v){const n=Number(v)||0,h=Math.floor(n),m=Math.round((n-h)*60);return`${h} h${m?' '+String(m).padStart(2,'0'):''}`}
+function orderTotal(o){return(Number(o.partQty)||0)*(Number(o.partUnitPrice)||0)}
+async function migrate(){const old=JSON.parse(localStorage.getItem(OLD_KEY)||'[]');if(!old.length||(await getAll()).length)return;for(const r of old)await put({...r,mechanic:r.mechanic||'Gaetan',status:r.status||'En attente',photos:r.photos||[],orders:r.orders||[]})}
+async function reload(){data=await getAll();render();refreshGlobalOrders()}
+function allOrders(){return data.flatMap(r=>(r.orders||[]).map((o,i)=>({...o,repairId:r.id,repairNumber:num(r),company:r.company,equipment:r.equipment,serial:r.serial,orderIndex:i})))}
+function render(){const q=$('q').value.trim().toLowerCase(),f=$('statusFilter').value;const rows=[...data].filter(r=>!f||r.status===f).filter(r=>JSON.stringify({...r,photos:[]}).toLowerCase().includes(q)).sort((a,b)=>(b.arrival||'').localeCompare(a.arrival||'')||(b.seq||0)-(a.seq||0));$('total').textContent=data.length;$('pending').textContent=data.filter(r=>!['Réparé','HS'].includes(r.status)).length;$('repaired').textContent=data.filter(r=>r.status==='Réparé').length;$('orderedPartsCount').textContent=allOrders().filter(o=>['À commander','Commandée'].includes(o.orderStatus)).length;$('list').innerHTML=rows.length?rows.map(r=>`<article class="card status-${slug(r.status)}"><div class="card-top"><div><div class="number">${num(r)}</div><h3>${esc(r.equipment||'Matériel')}</h3></div><span class="badge">${esc(r.status)}</span></div><div class="meta">${esc(r.company)}${r.arrival?' · '+frDate(r.arrival):''}</div><div class="meta">${esc([r.first,r.last].filter(Boolean).join(' '))}${r.serial?' · série/parc '+esc(r.serial):''}</div><div class="fault"><strong>Panne :</strong> ${esc(r.fault||'—')}</div><div class="meta">${r.hours?'Temps : '+hours(r.hours):''} · ${(r.orders||[]).length} commande(s)</div><div class="actions"><button class="secondary" onclick="editRepair('${r.id}')">Ouvrir / modifier</button><button class="ghost" onclick="printRepair('${r.id}')">Fiche PDF</button><button class="danger" onclick="deleteRepair('${r.id}')">Supprimer</button></div></article>`).join(''):'<div class="empty">Aucune réparation trouvée.</div>'}
+function resetForm(){$('repairForm').reset();$('id').value='';$('arrival').value=new Date().toISOString().slice(0,10);$('status').value='En attente';$('mechanic').value='Gaetan';currentPhotos=[];currentOrders=[];renderPhotos();renderRepairOrders()}
+function fill(r){['id','company','first','last','phone','equipment','brand','model','serial','fault','arrival','diagnostic','repair','hours','mechanic','status','departure','notes'].forEach(k=>$(k).value=r[k]||'');currentPhotos=[...(r.photos||[])];currentOrders=JSON.parse(JSON.stringify(r.orders||[]));renderPhotos();renderRepairOrders()}
+$('newBtn').onclick=()=>{resetForm();$('dialogTitle').textContent='Nouvelle réparation';$('repairNumber').textContent='Numéro attribué à l’enregistrement';$('repairDialog').showModal()}
+window.editRepair=id=>{const r=data.find(x=>x.id===id);if(!r)return;fill(r);$('dialogTitle').textContent='Fiche de réparation';$('repairNumber').textContent=num(r);$('repairDialog').showModal()}
+window.deleteRepair=async id=>{if(confirm('Supprimer définitivement cette réparation ?')){await remove(id);await reload()}}
+window.printRepair=id=>{editRepair(id);document.body.classList.add('print-repair');setTimeout(()=>window.print(),200)}
+function renderPhotos(){$('photoPreview').innerHTML=currentPhotos.map((s,i)=>`<div class="photo-item"><img src="${s}"><button type="button" onclick="removePhoto(${i})">×</button></div>`).join('')}
 window.removePhoto=i=>{currentPhotos.splice(i,1);renderPhotos()}
-function compressImage(file){
-  return new Promise((resolve,reject)=>{
-    const img=new Image(), reader=new FileReader();
-    reader.onload=()=>img.src=reader.result;reader.onerror=reject;
-    img.onload=()=>{
-      const max=1400, scale=Math.min(1,max/Math.max(img.width,img.height));
-      const c=document.createElement('canvas');c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
-      c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',.76));
-    };img.onerror=reject;reader.readAsDataURL(file);
-  });
-}
-$('photos').addEventListener('change',async e=>{
-  for(const f of [...e.target.files]) currentPhotos.push(await compressImage(f));
-  e.target.value='';renderPhotos();
-});
-
-$('repairForm').addEventListener('submit',async e=>{
-  e.preventDefault();
-  const rid=$('id').value||crypto.randomUUID();
-  const old=data.find(x=>x.id===rid);
-  const nextSeq=old?.seq||Math.max(0,...data.map(x=>Number(x.seq)||0))+1;
-  const keys=['company','first','last','phone','equipment','brand','model','serial','fault','arrival','diagnostic','repair','parts','partsCost','hours','mechanic','status','departure','notes'];
-  const r={id:rid,seq:nextSeq,photos:currentPhotos,updatedAt:new Date().toISOString()};
-  keys.forEach(k=>r[k]=$(k).value.trim?.()??$(k).value);
-  await put(r);$('repairDialog').close();await reload();
-});
-$('printBtn').onclick=()=>{
-  document.body.classList.add('print-repair');
-  window.print();
-};
-window.addEventListener('afterprint',()=>document.body.classList.remove('print-repair','print-report'));
-
-$('newBtn').onclick=newRepair;
-$('closeDialog').onclick=$('cancelBtn').onclick=()=>$('repairDialog').close();
-$('q').addEventListener('input',render);$('statusFilter').addEventListener('change',render);
-
-function currentMonth(){return new Date().toISOString().slice(0,7)}
-function reportRows(){
-  const company=$('reportCompany').value, month=$('reportMonth').value;
-  return data.filter(r=>r.company===company && (r.departure||r.arrival||'').slice(0,7)===month)
-    .sort((a,b)=>(a.departure||a.arrival||'').localeCompare(b.departure||b.arrival||''));
-}
-function refreshReport(){
-  const company=$('reportCompany').value, month=$('reportMonth').value, rate=Number($('hourlyRate').value)||0;
-  const rows=reportRows();
-  const totalHours=rows.reduce((s,r)=>s+(Number(r.hours)||0),0);
-  const totalParts=rows.reduce((s,r)=>s+(Number(r.partsCost)||0),0);
-  const labor=rate?totalHours*rate:0;
-  const monthText=month?new Date(month+'-01T12:00:00').toLocaleDateString('fr-FR',{month:'long',year:'numeric'}):'';
-  $('reportHeading').textContent=`${company} — ${monthText}`;
-  $('reportCount').textContent=rows.length;
-  $('reportHours').textContent=hoursLabel(totalHours);
-  $('reportPartsCost').textContent=money(totalParts);
-  $('reportLaborCost').textContent=rate?money(labor):'Taux non saisi';
-  $('grandTotal').textContent=rate?money(labor+totalParts):money(totalParts)+' + main-d’œuvre';
-  $('reportRows').innerHTML=rows.length?rows.map(r=>`
-    <tr>
-      <td>${repairNum(r)}</td>
-      <td>${frDate(r.departure||r.arrival)}</td>
-      <td><strong>${esc(r.equipment)}</strong><br>${esc([r.brand,r.model].filter(Boolean).join(' '))}</td>
-      <td>${esc(r.serial||'')}</td>
-      <td>${esc(r.repair||r.diagnostic||r.fault||'')}</td>
-      <td>${esc(r.parts||'')}</td>
-      <td>${hoursLabel(r.hours)}</td>
-      <td>${money(r.partsCost)}</td>
-    </tr>`).join(''):'<tr><td colspan="8">Aucune intervention pour cette société sur ce mois.</td></tr>';
-}
-$('reportBtn').onclick=()=>{
-  $('reportMonth').value=$('reportMonth').value||currentMonth();
-  refreshReport();$('reportDialog').showModal();
-}
-$('closeReport').onclick=()=>$('reportDialog').close();
-['reportCompany','reportMonth','hourlyRate'].forEach(id=>$(id).addEventListener('input',refreshReport));
-$('printReportBtn').onclick=()=>{
-  refreshReport();document.body.classList.add('print-report');window.print();
-}
-function csvCell(v){return `"${String(v??'').replaceAll('"','""')}"`}
-$('exportCsvBtn').onclick=()=>{
-  const rows=reportRows(), company=$('reportCompany').value, month=$('reportMonth').value;
-  const header=['N°','Date','Société','Matériel','Marque','Modèle','Série / parc','Travaux','Pièces','Heures','Montant pièces HT'];
-  const lines=[header,...rows.map(r=>[
-    repairNum(r),frDate(r.departure||r.arrival),r.company,r.equipment,r.brand,r.model,r.serial,
-    r.repair||r.diagnostic||r.fault,r.parts,Number(r.hours)||0,Number(r.partsCost)||0
-  ])];
-  const csv='\ufeff'+lines.map(row=>row.map(csvCell).join(';')).join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`recap-${slug(company)}-${month}.csv`;a.click();URL.revokeObjectURL(a.href);
-};
-
-$('menuBtn').onclick=()=>$('menuDialog').showModal();
-$('closeMenu').onclick=()=>$('menuDialog').close();
-$('exportBtn').onclick=()=>{
-  const blob=new Blob([JSON.stringify({version:3,exportedAt:new Date().toISOString(),repairs:data},null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`sauvegarde-justeau-sav-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href);
-};
-$('importFile').addEventListener('change',async e=>{
-  try{
-    const obj=JSON.parse(await e.target.files[0].text()), rows=Array.isArray(obj)?obj:obj.repairs;
-    if(!Array.isArray(rows))throw new Error();
-    if(!confirm(`Importer ${rows.length} réparation(s) ? Les données actuelles seront remplacées.`))return;
-    await clearStore();for(const r of rows)await put(r);await reload();$('menuDialog').close();
-  }catch{alert('Ce fichier de sauvegarde n’est pas valide.')}
-  e.target.value='';
-});
-
-(async()=>{
-  await openDB();await migrate();await reload();
-  $('reportMonth').value=currentMonth();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
-})();
+function compress(file){return new Promise((res,rej)=>{const i=new Image(),r=new FileReader();r.onload=()=>i.src=r.result;r.onerror=rej;i.onload=()=>{const max=1400,sc=Math.min(1,max/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=Math.round(i.width*sc);c.height=Math.round(i.height*sc);c.getContext('2d').drawImage(i,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',.76))};i.onerror=rej;r.readAsDataURL(file)})}
+$('photos').onchange=async e=>{for(const f of [...e.target.files])currentPhotos.push(await compress(f));e.target.value='';renderPhotos()}
+function renderRepairOrders(){$('repairOrdersList').innerHTML=currentOrders.length?currentOrders.map((o,i)=>`<article class="order-card status-${slug(o.orderStatus)}"><div class="order-head"><div><h3>${esc(o.partName)}</h3><div class="meta">${esc(o.supplier)} · réf. ${esc(o.partReference)}</div></div><span class="badge">${esc(o.orderStatus)}</span></div><div class="meta">Qté ${esc(o.partQty)} · ${money(orderTotal(o))}${o.orderDate?' · commandée le '+frDate(o.orderDate):''}</div><div class="actions"><button type="button" class="secondary" onclick="editOrder(${i})">Modifier</button></div></article>`).join(''):'<div class="empty">Aucune commande de pièce sur cette réparation.</div>'}
+$('addOrderBtn').onclick=()=>openOrder(-1);window.editOrder=i=>openOrder(i)
+function openOrder(i){$('orderForm').reset();$('orderIndex').value=i;$('partQty').value=1;$('orderStatus').value='À commander';$('deleteOrderBtn').style.display=i<0?'none':'inline-block';if(i>=0){const o=currentOrders[i];['supplier','partReference','partName','partQty','partUnitPrice','orderDate','receivedDate','purchaseOrderNumber','orderStatus','orderComment'].forEach(k=>$(k).value=o[k]||'')}$('orderDialog').showModal()}
+$('orderForm').onsubmit=e=>{e.preventDefault();const i=Number($('orderIndex').value),o={};['supplier','partReference','partName','partQty','partUnitPrice','orderDate','receivedDate','purchaseOrderNumber','orderStatus','orderComment'].forEach(k=>o[k]=$(k).value.trim?.()??$(k).value);if(o.orderStatus==='Reçue'&&!o.receivedDate)o.receivedDate=new Date().toISOString().slice(0,10);if(i<0)currentOrders.push(o);else currentOrders[i]=o;$('orderDialog').close();renderRepairOrders()}
+$('deleteOrderBtn').onclick=()=>{const i=Number($('orderIndex').value);if(i>=0&&confirm('Supprimer cette commande ?')){currentOrders.splice(i,1);$('orderDialog').close();renderRepairOrders()}}
+$('closeOrder').onclick=()=>$('orderDialog').close()
+$('repairForm').onsubmit=async e=>{e.preventDefault();const id=$('id').value||crypto.randomUUID(),old=data.find(x=>x.id===id),seq=old?.seq||Math.max(0,...data.map(x=>Number(x.seq)||0))+1,r={id,seq,photos:currentPhotos,orders:currentOrders,updatedAt:new Date().toISOString()};['company','first','last','phone','equipment','brand','model','serial','fault','arrival','diagnostic','repair','hours','mechanic','status','departure','notes'].forEach(k=>r[k]=$(k).value.trim?.()??$(k).value);if(r.orders.some(o=>['À commander','Commandée'].includes(o.orderStatus))&&r.status==='En attente')r.status='Pièce en commande';await put(r);$('repairDialog').close();await reload()}
+$('closeDialog').onclick=$('cancelBtn').onclick=()=>$('repairDialog').close();$('printBtn').onclick=()=>{document.body.classList.add('print-repair');window.print()};window.onafterprint=()=>document.body.classList.remove('print-repair','print-report');$('q').oninput=render;$('statusFilter').onchange=render
+function refreshGlobalOrders(){if(!$('globalOrdersList'))return;const sf=$('ordersSupplierFilter').value.trim().toLowerCase(),st=$('ordersStatusFilter').value,cf=$('ordersCompanyFilter').value;const rows=allOrders().filter(o=>!sf||(o.supplier||'').toLowerCase().includes(sf)).filter(o=>!st||o.orderStatus===st).filter(o=>!cf||o.company===cf).sort((a,b)=>(a.orderDate||'9999').localeCompare(b.orderDate||'9999'));$('globalOrdersList').innerHTML=rows.length?rows.map(o=>`<article class="order-card status-${slug(o.orderStatus)}"><div class="order-head"><div><div class="number">${o.repairNumber}</div><h3>${esc(o.partName)}</h3></div><span class="badge">${esc(o.orderStatus)}</span></div><div class="meta">${esc(o.company)} · ${esc(o.equipment)}${o.serial?' · série '+esc(o.serial):''}</div><div class="meta">Fournisseur : <strong>${esc(o.supplier)}</strong> · Réf. ${esc(o.partReference)} · Qté ${esc(o.partQty)}</div><div class="meta">${o.orderDate?'Commandée le '+frDate(o.orderDate):'Date non renseignée'} · ${money(orderTotal(o))}</div><div class="actions"><button class="secondary" onclick="openRepairFromOrder('${o.repairId}',${o.orderIndex})">Ouvrir la réparation</button></div></article>`).join(''):'<div class="empty">Aucune commande trouvée.</div>'}
+window.openRepairFromOrder=(id,i)=>{$('ordersDialog').close();editRepair(id);setTimeout(()=>openOrder(i),150)}
+$('ordersBtn').onclick=()=>{refreshGlobalOrders();$('ordersDialog').showModal()};$('closeOrders').onclick=()=>$('ordersDialog').close();['ordersSupplierFilter','ordersStatusFilter','ordersCompanyFilter'].forEach(id=>$(id).oninput=refreshGlobalOrders)
+function csvCell(v){return`"${String(v??'').replaceAll('"','""')}"`}
+$('exportOrdersCsvBtn').onclick=()=>{const rows=allOrders(),head=['Réparation','Société','Matériel','Série','Fournisseur','Référence','Pièce','Quantité','Prix unitaire HT','Total HT','Date commande','Date réception','Statut','N° commande','Commentaire'];const lines=[head,...rows.map(o=>[o.repairNumber,o.company,o.equipment,o.serial,o.supplier,o.partReference,o.partName,o.partQty,o.partUnitPrice,orderTotal(o),o.orderDate,o.receivedDate,o.orderStatus,o.purchaseOrderNumber,o.orderComment])];const blob=new Blob(['\ufeff'+lines.map(r=>r.map(csvCell).join(';')).join('\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='commandes-pieces.csv';a.click();URL.revokeObjectURL(a.href)}
+function reportRows(){const c=$('reportCompany').value,m=$('reportMonth').value;return data.filter(r=>r.company===c&&(r.departure||r.arrival||'').slice(0,7)===m)}
+function refreshReport(){const rows=reportRows(),rate=Number($('hourlyRate').value)||0,th=rows.reduce((s,r)=>s+(Number(r.hours)||0),0),tp=rows.reduce((s,r)=>s+(r.orders||[]).filter(o=>o.orderStatus!=='Annulée').reduce((a,o)=>a+orderTotal(o),0),0),lab=th*rate,m=$('reportMonth').value,c=$('reportCompany').value,mt=m?new Date(m+'-01T12:00:00').toLocaleDateString('fr-FR',{month:'long',year:'numeric'}):'';$('reportHeading').textContent=`${c} — ${mt}`;$('reportCount').textContent=rows.length;$('reportHours').textContent=hours(th);$('reportPartsCost').textContent=money(tp);$('reportLaborCost').textContent=rate?money(lab):'Taux non saisi';$('grandTotal').textContent=rate?money(tp+lab):money(tp)+' + main-d’œuvre';$('reportRows').innerHTML=rows.length?rows.map(r=>{const parts=(r.orders||[]).filter(o=>o.orderStatus!=='Annulée'),cost=parts.reduce((s,o)=>s+orderTotal(o),0);return`<tr><td>${num(r)}</td><td>${frDate(r.departure||r.arrival)}</td><td>${esc(r.equipment)}<br>${esc([r.brand,r.model].filter(Boolean).join(' '))}</td><td>${esc(r.serial)}</td><td>${esc(r.repair||r.diagnostic||r.fault)}</td><td>${parts.map(o=>`${esc(o.partName)} (${esc(o.supplier)})`).join('<br>')}</td><td>${hours(r.hours)}</td><td>${money(cost)}</td></tr>`}).join(''):'<tr><td colspan="8">Aucune intervention.</td></tr>'}
+$('reportBtn').onclick=()=>{if(!$('reportMonth').value)$('reportMonth').value=new Date().toISOString().slice(0,7);refreshReport();$('reportDialog').showModal()};$('closeReport').onclick=()=>$('reportDialog').close();['reportCompany','reportMonth','hourlyRate'].forEach(id=>$(id).oninput=refreshReport);$('printReportBtn').onclick=()=>{refreshReport();document.body.classList.add('print-report');window.print()}
+$('exportCsvBtn').onclick=()=>{const rows=reportRows(),head=['N°','Date','Société','Matériel','Marque','Modèle','Série','Travaux','Heures','Pièces HT'];const lines=[head,...rows.map(r=>[num(r),frDate(r.departure||r.arrival),r.company,r.equipment,r.brand,r.model,r.serial,r.repair||r.diagnostic||r.fault,Number(r.hours)||0,(r.orders||[]).filter(o=>o.orderStatus!=='Annulée').reduce((s,o)=>s+orderTotal(o),0)])];const blob=new Blob(['\ufeff'+lines.map(r=>r.map(csvCell).join(';')).join('\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`recap-${slug($('reportCompany').value)}-${$('reportMonth').value}.csv`;a.click();URL.revokeObjectURL(a.href)}
+$('menuBtn').onclick=()=>$('menuDialog').showModal();$('closeMenu').onclick=()=>$('menuDialog').close();$('exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify({version:4,exportedAt:new Date().toISOString(),repairs:data},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`sauvegarde-justeau-sav-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)}
+$('importFile').onchange=async e=>{try{const obj=JSON.parse(await e.target.files[0].text()),rows=Array.isArray(obj)?obj:obj.repairs;if(!Array.isArray(rows))throw 0;if(!confirm(`Importer ${rows.length} réparation(s) ?`))return;await clearStore();for(const r of rows)await put(r);await reload();$('menuDialog').close()}catch{alert('Fichier non valide')}e.target.value=''}
+;(async()=>{await openDB();await migrate();await reload();$('reportMonth').value=new Date().toISOString().slice(0,7);if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js')})()

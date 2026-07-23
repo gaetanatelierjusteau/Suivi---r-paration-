@@ -1,37 +1,19 @@
-JUSTEAU SAV — VERSION 3
+JUSTEAU SAV — VERSION 4
 
-NOUVEAUTÉ PRINCIPALE
-Un bouton « Récap mensuel » permet de choisir :
-- la société ;
-- le mois ;
-- éventuellement le taux horaire HT.
+NOUVEAUTÉS
+- Plusieurs commandes de pièces par réparation.
+- Plusieurs fournisseurs possibles pour un même matériel.
+- Fournisseur, référence, désignation, quantité, prix HT, dates, numéro de commande, statut et commentaire.
+- Onglet Commandes global avec filtres fournisseur, statut et société.
+- Export CSV des commandes.
+- Reprise automatique des pièces dans le récapitulatif mensuel.
 
-Le rapport calcule :
-- le nombre d’interventions ;
-- le total des heures ;
-- le montant total des pièces HT ;
-- le montant de main-d’œuvre HT si le taux horaire est renseigné ;
-- le total à reprendre pour la facturation.
+INSTALLATION
+1. Décompresser le ZIP.
+2. GitHub > Code > Add file > Upload files.
+3. Envoyer index.html, app.js, styles.css, manifest.webmanifest, service-worker.js, icon-192.png et icon-512.png.
+4. Commit changes.
+5. Attendre environ 2 minutes.
+6. Fermer puis rouvrir l’application. Au besoin ajouter ?v=4 à l’adresse.
 
-Le rapport peut être :
-- imprimé ou enregistré en PDF ;
-- exporté au format CSV pour la comptabilité.
-
-MISE À JOUR SUR GITHUB
-1. Décompressez Justeau_SAV_Version_3.zip.
-2. Dans le dépôt GitHub : Add file > Upload files.
-3. Sélectionnez les 7 fichiers techniques :
-   index.html, app.js, styles.css, manifest.webmanifest,
-   service-worker.js, icon-192.png et icon-512.png.
-4. Validez avec Commit changes.
-5. Attendez 1 à 3 minutes.
-6. Ouvrez l’application dans Safari avec ?v=3 à la fin de l’adresse.
-7. Fermez puis rouvrez l’icône de l’application si l’ancienne version reste affichée.
-
-DONNÉES
-La Version 3 utilise la même base locale que la Version 2.
-Les réparations déjà enregistrées sur le même appareil et la même adresse sont conservées.
-
-IMPORTANT
-Les données de l’iPhone et de l’iPad ne se synchronisent pas automatiquement.
-Faites régulièrement : menu ⋯ > Exporter les données.
+Les réparations déjà présentes restent conservées sur le même appareil.

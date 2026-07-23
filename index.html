@@ -19,6 +19,7 @@
     <p>Suivi des réparations atelier</p>
   </div>
   <div class="top-actions">
+    <button class="header-btn" id="ordersBtn">Commandes</button>
     <button class="header-btn" id="reportBtn">Récap mensuel</button>
     <button class="icon-btn" id="menuBtn" aria-label="Menu">⋯</button>
   </div>
@@ -40,6 +41,7 @@
   <section class="stats">
     <article><strong id="total">0</strong><span>Total</span></article>
     <article><strong id="pending">0</strong><span>À traiter</span></article>
+    <article><strong id="orderedPartsCount">0</strong><span>Commandes ouvertes</span></article>
     <article><strong id="repaired">0</strong><span>Réparés</span></article>
   </section>
 
@@ -87,8 +89,7 @@
     <div class="grid">
       <label class="wide">Diagnostic<textarea id="diagnostic"></textarea></label>
       <label class="wide">Réparation effectuée<textarea id="repair"></textarea></label>
-      <label class="wide">Pièces remplacées / commandées<textarea id="parts" placeholder="Ex. 1 filtre à huile, 2 courroies…"></textarea></label>
-      <label>Montant total des pièces HT (€)<input id="partsCost" type="number" min="0" step="0.01" inputmode="decimal"></label>
+
       <label>Temps passé (heures)<input id="hours" type="number" min="0" step="0.25" inputmode="decimal"></label>
       <label>Mécanicien
         <select id="mechanic"><option>Gaetan</option></select>
@@ -106,6 +107,11 @@
       <label class="wide">Observations<textarea id="notes"></textarea></label>
     </div>
 
+    <h2>Commandes de pièces</h2>
+    <p class="help">Ajoutez autant de pièces et de fournisseurs que nécessaire pour cette réparation.</p>
+    <div id="repairOrdersList" class="order-list"></div>
+    <button type="button" class="secondary block" id="addOrderBtn">+ Ajouter une commande de pièce</button>
+
     <h2>Photos</h2>
     <p class="help">Ajoutez plusieurs photos. Elles sont conservées sur cet appareil.</p>
     <input id="photos" type="file" accept="image/*" capture="environment" multiple>
@@ -118,6 +124,40 @@
     <button type="submit" class="primary">Enregistrer</button>
   </div>
 </form>
+</dialog>
+
+
+<dialog id="orderDialog" class="small-dialog">
+<form id="orderForm">
+  <div class="dialog-head"><strong>Commande de pièce</strong><button type="button" class="ghost" id="closeOrder">Fermer</button></div>
+  <div class="dialog-body grid">
+    <input type="hidden" id="orderIndex">
+    <label>Fournisseur<input id="supplier" required placeholder="Ex. TVH, Würth…"></label>
+    <label>Référence<input id="partReference" required></label>
+    <label class="wide">Désignation de la pièce<input id="partName" required></label>
+    <label>Quantité<input id="partQty" type="number" min="1" step="1" value="1" required></label>
+    <label>Prix unitaire HT (€)<input id="partUnitPrice" type="number" min="0" step="0.01"></label>
+    <label>Date de commande<input id="orderDate" type="date"></label>
+    <label>Date de réception<input id="receivedDate" type="date"></label>
+    <label>Numéro de commande<input id="purchaseOrderNumber"></label>
+    <label>Statut<select id="orderStatus"><option>À commander</option><option>Commandée</option><option>Reçue</option><option>Annulée</option></select></label>
+    <label class="wide">Commentaire<textarea id="orderComment"></textarea></label>
+  </div>
+  <div class="dialog-foot"><button type="button" class="danger" id="deleteOrderBtn">Supprimer</button><button type="submit" class="primary">Enregistrer la commande</button></div>
+</form>
+</dialog>
+
+<dialog id="ordersDialog" class="report-dialog">
+  <div class="dialog-head"><div><strong>Commandes de pièces</strong><small>Suivi par fournisseur et par réparation</small></div><button class="ghost" id="closeOrders">Fermer</button></div>
+  <div class="dialog-body">
+    <div class="report-filters">
+      <label>Fournisseur<input id="ordersSupplierFilter" placeholder="Tous les fournisseurs"></label>
+      <label>Statut<select id="ordersStatusFilter"><option value="">Tous les statuts</option><option>À commander</option><option>Commandée</option><option>Reçue</option><option>Annulée</option></select></label>
+      <label>Société<select id="ordersCompanyFilter"><option value="">Toutes les sociétés</option><option>Justeau TP</option><option>Justeau Frères</option><option>SECA</option><option>SAS Havard</option></select></label>
+    </div>
+    <div id="globalOrdersList" class="order-list"></div>
+  </div>
+  <div class="dialog-foot"><button class="secondary" id="exportOrdersCsvBtn">Exporter CSV</button></div>
 </dialog>
 
 <dialog id="reportDialog" class="report-dialog">
