@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#b71c1c"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Réparations">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="styles.css"><title>Suivi Réparations</title></head>
+<body>
+<header><div><h1>Suivi Réparations</h1><small>Atelier Justeau</small></div><button id="newBtn">＋ Nouvelle réparation</button></header>
+<main>
+<div class="tools"><input id="search" type="search" placeholder="Rechercher : nom, société, matériel, n° de série…">
+<select id="filter"><option value="">Tous les statuts</option><option>Réceptionné</option><option>En attente de pièces</option><option>En attente de réponse de devis</option><option>HS</option><option>Terminé</option><option>Livré</option></select></div>
+<div id="summary" class="summary"></div><div id="list"></div><p id="empty" class="empty">Aucune réparation enregistrée.</p>
+</main>
+<dialog id="formDialog"><form id="form">
+<div class="head"><h2 id="formTitle">Nouvelle réparation</h2><button type="button" id="closeForm" class="ghost">✕</button></div>
+<input type="hidden" id="id">
+<div class="grid">
+<label>Prénom<input id="firstName"></label><label>Nom<input id="lastName"></label>
+<label>Téléphone<input id="phone" type="tel"></label>
+<label>Société<select id="company"><option value="">Choisir</option><option>Justeau TP</option><option>Justeau Frères</option><option>SECA</option><option>SAS Havard</option></select></label>
+<label>Matériel<input id="equipment"></label><label>Marque<input id="brand"></label>
+<label>Modèle<input id="model"></label><label>N° de série<input id="serial"></label>
+<label>Date d'arrivée<input id="arrival" type="date"></label><label>Date de départ<input id="departure" type="date"></label>
+<label class="wide">Panne<textarea id="failure"></textarea></label>
+<label class="wide">Diagnostic<textarea id="diagnosis"></textarea></label>
+<label class="wide">Réparation effectuée<textarea id="repairDone"></textarea></label>
+<label class="wide">Pièces remplacées<textarea id="parts"></textarea></label>
+<label>Statut<select id="status"><option>Réceptionné</option><option>En attente de pièces</option><option>En attente de réponse de devis</option><option>HS</option><option>Terminé</option><option>Livré</option></select></label>
+<label>Photo<input id="photo" type="file" accept="image/*" capture="environment"></label>
+<div id="photoBox" class="wide hidden"><img id="photoPreview"><button type="button" id="removePhoto" class="secondary">Supprimer la photo</button></div>
+</div>
+<div class="actions"><button type="button" id="cancel" class="secondary">Annuler</button><button type="submit">Enregistrer</button></div>
+</form></dialog>
+<dialog id="detailDialog"><div id="detail"></div><div class="actions"><button id="edit">Modifier</button><button id="delete" class="danger">Supprimer</button><button id="closeDetail" class="secondary">Fermer</button></div></dialog>
+<footer><button id="export" class="secondary">Exporter une sauvegarde</button><label class="secondary upload">Importer une sauvegarde<input id="import" type="file" accept="application/json" hidden></label></footer>
+<script src="app.js"></script></body></html>

@@ -1,0 +1,4 @@
+Application personnelle de suivi des réparations.
+Fonctions : ajout, modification, suppression, recherche, filtres, photos, sauvegarde/restauration.
+Pour l'installer sur iPhone/iPad, publier ce dossier sur un hébergement HTTPS gratuit, puis ouvrir le lien dans Safari > Partager > Sur l'écran d'accueil.
+Les données restent uniquement sur l'appareil. Exportez régulièrement une sauvegarde JSON.
