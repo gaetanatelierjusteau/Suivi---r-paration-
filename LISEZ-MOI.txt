@@ -1,23 +1,23 @@
-JUSTEAU SAV — VERSION 5
+JUSTEAU SAV — VERSION 6
 
 NOUVEAUTÉS
-- Nouvelle identité visuelle rouge et blanche.
-- Nouvelle icône Justeau SAV assortie.
-- Bouton Partager sur iPhone et Android.
-- Tableau « Priorités atelier » : réparations de plus de 15 jours, commandes ouvertes depuis plus de 7 jours et dossiers sans diagnostic.
-- Signalement visuel des réparations anciennes.
-- Récapitulatif mensuel et impressions modernisés.
-- Toutes les fonctions de la Version 4 sont conservées : réparations, photos, commandes multi-fournisseurs, CSV et sauvegardes.
+- Menu Mécanicien : Gaetan, Michael, Jean Michel R., Jocelyn, Stéphane, Jean Michel et Laurent.
+- Option « Autre… » : ajout d’un nouveau mécanicien directement depuis l’application. Le nom est mémorisé et apparaît ensuite automatiquement dans la liste.
+- Récap mensuel amélioré : total heures, total pièces facturées HT, main-d’œuvre HT et total HT à facturer calculés automatiquement.
+- Le taux horaire est mémorisé séparément pour chaque société après saisie.
+- Champ e-mail comptabilité mémorisé.
+- Bouton « Envoyer par mail » : ouvre la messagerie avec le récapitulatif complet et tous les totaux déjà calculés.
+- Bouton « Partager le récap » pour iPhone/iPad/Android.
+- Toutes les fonctions de la Version 5 sont conservées.
 
-MISE À JOUR SUR GITHUB
-1. Décompresser ce ZIP.
-2. GitHub > dépôt de l’application > Add file > Upload files.
-3. Envoyer TOUS les fichiers contenus dans ce dossier et remplacer les anciens.
-4. Cliquer sur Commit changes.
-5. Attendre 2 à 5 minutes.
-6. Sur le téléphone, fermer complètement l’application puis la rouvrir.
-7. Si l’ancienne couleur reste affichée, ouvrir l’adresse dans Chrome/Safari avec ?v=5 à la fin, puis relancer l’application.
+MISE À JOUR
+1. Faites d’abord une sauvegarde depuis le menu ⋯ > Exporter les données.
+2. Décompressez Justeau_SAV_Version_6.zip.
+3. GitHub > Code > Add file > Upload files.
+4. Envoyez index.html, app.js, styles.css, manifest.webmanifest, service-worker.js, icon-192.png et icon-512.png.
+5. Commit changes.
+6. Attendez environ 2 minutes.
+7. Fermez complètement l’application puis rouvrez-la. Si nécessaire, ouvrez une fois l’adresse avec ?v=6.
 
 IMPORTANT
-- Les réparations déjà enregistrées restent sur l’appareil : la mise à jour ne les efface pas.
-- Chaque téléphone conserve actuellement sa propre base de données. Une sauvegarde/export reste recommandée avant une mise à jour.
+Les réparations existantes sont conservées sur le même appareil. Les mécaniciens ajoutés via « Autre… », les taux horaires et l’adresse e-mail comptabilité sont mémorisés localement sur l’appareil.

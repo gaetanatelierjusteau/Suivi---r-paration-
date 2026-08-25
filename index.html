@@ -49,7 +49,7 @@
   <section class="dashboard-panel" aria-label="Priorités atelier">
     <div class="dashboard-head">
       <div><strong>Priorités atelier</strong><span>Les dossiers qui demandent votre attention</span></div>
-      <span class="version-badge">Version 5</span>
+      <span class="version-badge">Version 6</span>
     </div>
     <div class="priority-grid">
       <button type="button" class="priority-card" id="lateRepairsBtn"><strong id="lateRepairsCount">0</strong><span>Réparations de plus de 15 jours</span></button>
@@ -105,7 +105,20 @@
 
       <label>Temps passé (heures)<input id="hours" type="number" min="0" step="0.25" inputmode="decimal"></label>
       <label>Mécanicien
-        <select id="mechanic"><option>Gaetan</option></select>
+        <select id="mechanic">
+          <option>Gaetan</option>
+          <option>Michael</option>
+          <option>Jean Michel R.</option>
+          <option>Jocelyn</option>
+          <option>Stéphane</option>
+          <option>Jean Michel</option>
+          <option>Laurent</option>
+          <option value="__other__">Autre…</option>
+        </select>
+        <span id="mechanicOtherWrap" class="inline-add" hidden>
+          <input id="newMechanicName" type="text" placeholder="Nom du nouveau mécanicien">
+          <button type="button" class="secondary" id="saveMechanicBtn">Ajouter</button>
+        </span>
       </label>
       <label>Statut
         <select id="status" required>
@@ -193,7 +206,8 @@
         </select>
       </label>
       <label>Mois<input id="reportMonth" type="month"></label>
-      <label>Taux horaire HT (€)<input id="hourlyRate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Facultatif"></label>
+      <label>Taux horaire HT (€)<input id="hourlyRate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex. 65,00"></label>
+      <label>E-mail comptabilité<input id="accountingEmail" type="email" placeholder="comptabilite@entreprise.fr"></label>
     </div>
 
     <section id="reportPrintArea">
@@ -205,7 +219,7 @@
       <div class="report-summary">
         <article><span>Total interventions</span><strong id="reportCount">0</strong></article>
         <article><span>Total heures</span><strong id="reportHours">0 h</strong></article>
-        <article><span>Pièces HT</span><strong id="reportPartsCost">0,00 €</strong></article>
+        <article><span>Total pièces facturées HT</span><strong id="reportPartsCost">0,00 €</strong></article>
         <article><span>Main-d’œuvre HT</span><strong id="reportLaborCost">—</strong></article>
       </div>
 
@@ -230,6 +244,8 @@
 
   <div class="dialog-foot">
     <button class="secondary" id="exportCsvBtn">Exporter CSV</button>
+    <button class="secondary" id="shareReportBtn">Partager le récap</button>
+    <button class="primary" id="emailReportBtn">Envoyer par mail</button>
     <button class="primary" id="printReportBtn">Imprimer / PDF</button>
   </div>
 </dialog>
