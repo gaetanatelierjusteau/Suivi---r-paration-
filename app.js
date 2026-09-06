@@ -1,85 +1,196 @@
-const OLD_KEY='justeau-sav-simple-v1',DB_NAME='justeau-sav-v2',STORE='repairs';
-const $=id=>document.getElementById(id);let db,data=[],currentPhotos=[],currentOrders=[];
-const BASE_MECHANICS=['Gaetan','Michael','Jean Michel R.','Jocelyn','Stéphane','Jean Michel','Laurent'];
-const MECHANICS_KEY='justeau-sav-mechanics-v1',RATES_KEY='justeau-sav-hourly-rates-v1',ACCOUNTING_EMAIL_KEY='justeau-sav-accounting-email-v1';
-function savedMechanics(){try{return JSON.parse(localStorage.getItem(MECHANICS_KEY)||'[]').filter(Boolean)}catch{return[]}}
-function mechanics(){return [...new Set([...BASE_MECHANICS,...savedMechanics()])]}
-function rebuildMechanics(selected='Gaetan'){const sel=$('mechanic');if(!sel)return;const names=mechanics();sel.innerHTML=names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')+'<option value="__other__">Autre…</option>';if(selected&&names.includes(selected))sel.value=selected;else if(selected&&selected!=='__other__'){const extra=savedMechanics();extra.push(selected);localStorage.setItem(MECHANICS_KEY,JSON.stringify([...new Set(extra)]));return rebuildMechanics(selected)}else sel.value='Gaetan'}
-function showMechanicOther(show){const w=$('mechanicOtherWrap');if(w)w.hidden=!show;if(show)setTimeout(()=>$('newMechanicName')?.focus(),0)}
-function savedRates(){try{return JSON.parse(localStorage.getItem(RATES_KEY)||'{}')}catch{return{}}}
-function saveRate(company,rate){const rates=savedRates();rates[company]=Number(rate)||0;localStorage.setItem(RATES_KEY,JSON.stringify(rates))}
+const $=id=>document.getElementById(id);
+const SERVER_KEY='justeau_v7_server';
+let sb=null,currentUser=null,currentProfile=null,profiles=[],repairs=[],parts=[],currentRepair=null,currentPartRepair=null,realtimeChannels=[];
+const ACCOUNTING_COMPANIES=['Justeau Frères','SECA','SAS Havard'];
 
-function openDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE,{keyPath:'id'});r.onsuccess=()=>{db=r.result;resolve()};r.onerror=()=>reject(r.error)})}
-function tx(m='readonly'){return db.transaction(STORE,m).objectStore(STORE)}
-function getAll(){return new Promise((res,rej)=>{const r=tx().getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-function put(v){return new Promise((res,rej)=>{const r=tx('readwrite').put(v);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
-function remove(id){return new Promise((res,rej)=>{const r=tx('readwrite').delete(id);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
-function clearStore(){return new Promise((res,rej)=>{const r=tx('readwrite').clear();r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
-function num(r){return'R-'+String(r.seq||0).padStart(6,'0')}
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function slug(s){return(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
-function frDate(v){if(!v)return'';const[y,m,d]=v.split('-');return`${d}/${m}/${y}`}
-function money(v){return(Number(v)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
-function hours(v){const n=Number(v)||0,h=Math.floor(n),m=Math.round((n-h)*60);return`${h} h${m?' '+String(m).padStart(2,'0'):''}`}
-function orderTotal(o){return(Number(o.partQty)||0)*(Number(o.partUnitPrice)||0)}
-async function migrate(){const old=JSON.parse(localStorage.getItem(OLD_KEY)||'[]');if(!old.length||(await getAll()).length)return;for(const r of old)await put({...r,mechanic:r.mechanic||'Gaetan',status:r.status||'En attente',photos:r.photos||[],orders:r.orders||[]})}
-async function reload(){data=await getAll();render();refreshGlobalOrders()}
-function daysSince(v){if(!v)return 0;const d=new Date(v+'T12:00:00'),now=new Date();return Math.max(0,Math.floor((now-d)/86400000))}
-function isLateRepair(r){return !['Réparé','HS'].includes(r.status)&&daysSince(r.arrival)>15}
-function isLateOrder(o){return ['À commander','Commandée'].includes(o.orderStatus)&&daysSince(o.orderDate||o.createdAt||'')>7}
-function allOrders(){return data.flatMap(r=>(r.orders||[]).map((o,i)=>({...o,repairId:r.id,repairNumber:num(r),company:r.company,equipment:r.equipment,serial:r.serial,orderIndex:i})))}
-function render(){const q=$('q').value.trim().toLowerCase(),f=$('statusFilter').value;const rows=[...data].filter(r=>!f||r.status===f).filter(r=>JSON.stringify({...r,photos:[]}).toLowerCase().includes(q)).sort((a,b)=>(b.arrival||'').localeCompare(a.arrival||'')||(b.seq||0)-(a.seq||0));const orders=allOrders(),lateRepairs=data.filter(isLateRepair),lateOrders=orders.filter(isLateOrder),noDiagnosis=data.filter(r=>!['Réparé','HS'].includes(r.status)&&!(r.diagnostic||'').trim());$('total').textContent=data.length;$('pending').textContent=data.filter(r=>!['Réparé','HS'].includes(r.status)).length;$('repaired').textContent=data.filter(r=>r.status==='Réparé').length;$('orderedPartsCount').textContent=orders.filter(o=>['À commander','Commandée'].includes(o.orderStatus)).length;$('lateRepairsCount').textContent=lateRepairs.length;$('lateOrdersCount').textContent=lateOrders.length;$('noDiagnosisCount').textContent=noDiagnosis.length;$('list').innerHTML=rows.length?rows.map(r=>`<article class="card status-${slug(r.status)} ${isLateRepair(r)?'is-late':''}"><div class="card-top"><div><div class="number">${num(r)}${isLateRepair(r)?'<span class="badge late-badge">+'+daysSince(r.arrival)+' j</span>':''}</div><h3>${esc(r.equipment||'Matériel')}</h3></div><span class="badge">${esc(r.status)}</span></div><div class="meta">${esc(r.company)}${r.arrival?' · '+frDate(r.arrival):''}</div><div class="meta">${esc([r.first,r.last].filter(Boolean).join(' '))}${r.serial?' · série/parc '+esc(r.serial):''}</div><div class="fault"><strong>Panne :</strong> ${esc(r.fault||'—')}</div><div class="meta">${r.hours?'Temps : '+hours(r.hours):''} · ${(r.orders||[]).length} commande(s)</div><div class="actions"><button class="secondary" onclick="editRepair('${r.id}')">Ouvrir / modifier</button><button class="ghost" onclick="printRepair('${r.id}')">Fiche PDF</button><button class="danger" onclick="deleteRepair('${r.id}')">Supprimer</button></div></article>`).join(''):'<div class="empty">Aucune réparation trouvée.</div>'}
-function resetForm(){$('repairForm').reset();rebuildMechanics('Gaetan');showMechanicOther(false);$('newMechanicName').value='';$('id').value='';$('arrival').value=new Date().toISOString().slice(0,10);$('status').value='En attente';$('mechanic').value='Gaetan';currentPhotos=[];currentOrders=[];renderPhotos();renderRepairOrders()}
-function fill(r){['id','company','first','last','phone','equipment','brand','model','serial','fault','arrival','diagnostic','repair','hours','status','departure','notes'].forEach(k=>$(k).value=r[k]||'');rebuildMechanics(r.mechanic||'Gaetan');showMechanicOther(false);currentPhotos=[...(r.photos||[])];currentOrders=JSON.parse(JSON.stringify(r.orders||[]));renderPhotos();renderRepairOrders()}
-$('newBtn').onclick=()=>{resetForm();$('dialogTitle').textContent='Nouvelle réparation';$('repairNumber').textContent='Numéro attribué à l’enregistrement';$('repairDialog').showModal()}
-window.editRepair=id=>{const r=data.find(x=>x.id===id);if(!r)return;fill(r);$('dialogTitle').textContent='Fiche de réparation';$('repairNumber').textContent=num(r);$('repairDialog').showModal()}
-window.deleteRepair=async id=>{if(confirm('Supprimer définitivement cette réparation ?')){await remove(id);await reload()}}
-window.printRepair=id=>{editRepair(id);document.body.classList.add('print-repair');setTimeout(()=>window.print(),200)}
-function renderPhotos(){$('photoPreview').innerHTML=currentPhotos.map((s,i)=>`<div class="photo-item"><img src="${s}"><button type="button" onclick="removePhoto(${i})">×</button></div>`).join('')}
-window.removePhoto=i=>{currentPhotos.splice(i,1);renderPhotos()}
-function compress(file){return new Promise((res,rej)=>{const i=new Image(),r=new FileReader();r.onload=()=>i.src=r.result;r.onerror=rej;i.onload=()=>{const max=1400,sc=Math.min(1,max/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=Math.round(i.width*sc);c.height=Math.round(i.height*sc);c.getContext('2d').drawImage(i,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',.76))};i.onerror=rej;r.readAsDataURL(file)})}
-$('photos').onchange=async e=>{for(const f of [...e.target.files])currentPhotos.push(await compress(f));e.target.value='';renderPhotos()}
-function renderRepairOrders(){$('repairOrdersList').innerHTML=currentOrders.length?currentOrders.map((o,i)=>`<article class="order-card status-${slug(o.orderStatus)}"><div class="order-head"><div><h3>${esc(o.partName)}</h3><div class="meta">${esc(o.supplier)} · réf. ${esc(o.partReference)}</div></div><span class="badge">${esc(o.orderStatus)}</span></div><div class="meta">Qté ${esc(o.partQty)} · ${money(orderTotal(o))}${o.orderDate?' · commandée le '+frDate(o.orderDate):''}</div><div class="actions"><button type="button" class="secondary" onclick="editOrder(${i})">Modifier</button></div></article>`).join(''):'<div class="empty">Aucune commande de pièce sur cette réparation.</div>'}
-$('addOrderBtn').onclick=()=>openOrder(-1);window.editOrder=i=>openOrder(i)
-function openOrder(i){$('orderForm').reset();$('orderIndex').value=i;$('partQty').value=1;$('orderStatus').value='À commander';$('deleteOrderBtn').style.display=i<0?'none':'inline-block';if(i>=0){const o=currentOrders[i];['supplier','partReference','partName','partQty','partUnitPrice','orderDate','receivedDate','purchaseOrderNumber','orderStatus','orderComment'].forEach(k=>$(k).value=o[k]||'')}$('orderDialog').showModal()}
-$('orderForm').onsubmit=e=>{e.preventDefault();const i=Number($('orderIndex').value),o={};['supplier','partReference','partName','partQty','partUnitPrice','orderDate','receivedDate','purchaseOrderNumber','orderStatus','orderComment'].forEach(k=>o[k]=$(k).value.trim?.()??$(k).value);if(o.orderStatus==='Reçue'&&!o.receivedDate)o.receivedDate=new Date().toISOString().slice(0,10);if(i<0){o.createdAt=new Date().toISOString().slice(0,10);currentOrders.push(o)}else{o.createdAt=currentOrders[i].createdAt||new Date().toISOString().slice(0,10);currentOrders[i]=o;}$('orderDialog').close();renderRepairOrders()}
-$('deleteOrderBtn').onclick=()=>{const i=Number($('orderIndex').value);if(i>=0&&confirm('Supprimer cette commande ?')){currentOrders.splice(i,1);$('orderDialog').close();renderRepairOrders()}}
-$('closeOrder').onclick=()=>$('orderDialog').close()
-$('repairForm').onsubmit=async e=>{e.preventDefault();const id=$('id').value||crypto.randomUUID(),old=data.find(x=>x.id===id),seq=old?.seq||Math.max(0,...data.map(x=>Number(x.seq)||0))+1,r={id,seq,photos:currentPhotos,orders:currentOrders,updatedAt:new Date().toISOString()};['company','first','last','phone','equipment','brand','model','serial','fault','arrival','diagnostic','repair','hours','status','departure','notes'].forEach(k=>r[k]=$(k).value.trim?.()??$(k).value);r.mechanic=$('mechanic').value==='__other__'?'':$('mechanic').value;if(!r.mechanic){alert('Ajoutez ou sélectionnez un mécanicien.');return;}if(r.orders.some(o=>['À commander','Commandée'].includes(o.orderStatus))&&r.status==='En attente')r.status='Pièce en commande';await put(r);$('repairDialog').close();await reload()}
-$('closeDialog').onclick=$('cancelBtn').onclick=()=>$('repairDialog').close();$('printBtn').onclick=()=>{document.body.classList.add('print-repair');window.print()};window.onafterprint=()=>document.body.classList.remove('print-repair','print-report');$('q').oninput=render;$('statusFilter').onchange=render
-function refreshGlobalOrders(){if(!$('globalOrdersList'))return;const sf=$('ordersSupplierFilter').value.trim().toLowerCase(),st=$('ordersStatusFilter').value,cf=$('ordersCompanyFilter').value;const rows=allOrders().filter(o=>!sf||(o.supplier||'').toLowerCase().includes(sf)).filter(o=>!st||o.orderStatus===st).filter(o=>!cf||o.company===cf).sort((a,b)=>(a.orderDate||'9999').localeCompare(b.orderDate||'9999'));$('globalOrdersList').innerHTML=rows.length?rows.map(o=>`<article class="order-card status-${slug(o.orderStatus)}"><div class="order-head"><div><div class="number">${o.repairNumber}</div><h3>${esc(o.partName)}</h3></div><span class="badge">${esc(o.orderStatus)}</span></div><div class="meta">${esc(o.company)} · ${esc(o.equipment)}${o.serial?' · série '+esc(o.serial):''}</div><div class="meta">Fournisseur : <strong>${esc(o.supplier)}</strong> · Réf. ${esc(o.partReference)} · Qté ${esc(o.partQty)}</div><div class="meta">${o.orderDate?'Commandée le '+frDate(o.orderDate):'Date non renseignée'} · ${money(orderTotal(o))}</div><div class="actions"><button class="secondary" onclick="openRepairFromOrder('${o.repairId}',${o.orderIndex})">Ouvrir la réparation</button></div></article>`).join(''):'<div class="empty">Aucune commande trouvée.</div>'}
-window.openRepairFromOrder=(id,i)=>{$('ordersDialog').close();editRepair(id);setTimeout(()=>openOrder(i),150)}
-$('ordersBtn').onclick=()=>{refreshGlobalOrders();$('ordersDialog').showModal()};$('closeOrders').onclick=()=>$('ordersDialog').close();['ordersSupplierFilter','ordersStatusFilter','ordersCompanyFilter'].forEach(id=>$(id).oninput=refreshGlobalOrders)
-function csvCell(v){return`"${String(v??'').replaceAll('"','""')}"`}
-$('exportOrdersCsvBtn').onclick=()=>{const rows=allOrders(),head=['Réparation','Société','Matériel','Série','Fournisseur','Référence','Pièce','Quantité','Prix unitaire HT','Total HT','Date commande','Date réception','Statut','N° commande','Commentaire'];const lines=[head,...rows.map(o=>[o.repairNumber,o.company,o.equipment,o.serial,o.supplier,o.partReference,o.partName,o.partQty,o.partUnitPrice,orderTotal(o),o.orderDate,o.receivedDate,o.orderStatus,o.purchaseOrderNumber,o.orderComment])];const blob=new Blob(['\ufeff'+lines.map(r=>r.map(csvCell).join(';')).join('\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='commandes-pieces.csv';a.click();URL.revokeObjectURL(a.href)}
-function reportRows(){const c=$('reportCompany').value,m=$('reportMonth').value;return data.filter(r=>r.company===c&&(r.departure||r.arrival||'').slice(0,7)===m)}
-function refreshReport(){
-  const rows=reportRows(),rate=Number($('hourlyRate').value)||0;
-  const totalHours=rows.reduce((s,r)=>s+(Number(r.hours)||0),0);
-  const totalParts=rows.reduce((s,r)=>s+(r.orders||[]).filter(o=>o.orderStatus!=='Annulée').reduce((a,o)=>a+orderTotal(o),0),0);
-  const labor=totalHours*rate,m=$('reportMonth').value,c=$('reportCompany').value;
-  const mt=m?new Date(m+'-01T12:00:00').toLocaleDateString('fr-FR',{month:'long',year:'numeric'}):'';
-  $('reportHeading').textContent=`${c} — ${mt}`;$('reportCount').textContent=rows.length;$('reportHours').textContent=hours(totalHours);$('reportPartsCost').textContent=money(totalParts);$('reportLaborCost').textContent=money(labor);$('grandTotal').textContent=money(totalParts+labor);
-  $('reportRows').innerHTML=rows.length?rows.map(r=>{const parts=(r.orders||[]).filter(o=>o.orderStatus!=='Annulée'),cost=parts.reduce((s,o)=>s+orderTotal(o),0);return`<tr><td>${num(r)}</td><td>${frDate(r.departure||r.arrival)}</td><td>${esc(r.equipment)}<br>${esc([r.brand,r.model].filter(Boolean).join(' '))}</td><td>${esc(r.serial)}</td><td>${esc(r.repair||r.diagnostic||r.fault)}</td><td>${parts.map(o=>`${esc(o.partName)} (${esc(o.supplier)})`).join('<br>')}</td><td>${hours(r.hours)}</td><td>${money(cost)}</td></tr>`}).join(''):'<tr><td colspan="8">Aucune intervention.</td></tr>';
-  return {rows,totalHours,totalParts,labor,total:totalParts+labor,rate,company:c,month:m,monthText:mt};
+function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;setTimeout(()=>t.hidden=true,2600)}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function slug(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
+function frDate(v){if(!v)return'';const d=new Date(v+'T12:00:00');return d.toLocaleDateString('fr-FR')}
+function money(v){return (Number(v)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
+function hoursLabel(v){const n=Number(v)||0,h=Math.floor(n),m=Math.round((n-h)*60);return `${h} h${m?` ${String(m).padStart(2,'0')}`:''}`}
+function isManager(){return currentProfile?.role==='manager'}
+function profileName(id){return profiles.find(p=>p.id===id)?.full_name||'Non attribué'}
+function repairNo(r){return r.repair_no?`R-${String(r.repair_no).padStart(6,'0')}`:'R-…'}
+
+function getServer(){try{return JSON.parse(localStorage.getItem(SERVER_KEY)||'null')}catch{return null}}
+function saveServer(){const url=$('supabaseUrl').value.trim(),key=$('supabaseKey').value.trim();if(!url||!key)return alert('Renseignez l’URL et la clé publique Supabase.');localStorage.setItem(SERVER_KEY,JSON.stringify({url,key}));location.reload()}
+function clearServer(){if(confirm('Changer la configuration du serveur sur cet appareil ?')){localStorage.removeItem(SERVER_KEY);location.reload()}}
+function initSupabase(){
+  const s=getServer(); if(!s){$('setupPanel').hidden=false;return false}
+  $('setupPanel').hidden=true; $('authPanel').hidden=false;
+  sb=supabase.createClient(s.url,s.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  return true
 }
-function reportText(){const x=refreshReport();const details=x.rows.map(r=>{const parts=(r.orders||[]).filter(o=>o.orderStatus!=='Annulée'),cost=parts.reduce((s,o)=>s+orderTotal(o),0),partNames=parts.map(o=>`${o.partName} (${o.supplier})`).join(', ')||'Aucune';return `${num(r)} | ${frDate(r.departure||r.arrival)} | ${r.equipment||''} | ${hours(r.hours)} | Pièces: ${partNames} | ${money(cost)}`}).join('\n');return `JUSTEAU SAV — RÉCAPITULATIF MENSUEL\n\nSociété : ${x.company}\nMois : ${x.monthText}\nAtelier réparateur : Justeau TP\n\nDÉTAIL DES INTERVENTIONS\n${details||'Aucune intervention'}\n\nTOTAUX\nNombre d’interventions : ${x.rows.length}\nTotal heures : ${hours(x.totalHours)}\nTaux horaire HT : ${money(x.rate)}\nMain-d’œuvre HT : ${money(x.labor)}\nTotal pièces facturées HT : ${money(x.totalParts)}\nTOTAL HT À FACTURER : ${money(x.total)}`;}
-$('reportBtn').onclick=()=>{if(!$('reportMonth').value)$('reportMonth').value=new Date().toISOString().slice(0,7);const rates=savedRates();$('hourlyRate').value=rates[$('reportCompany').value]||'';$('accountingEmail').value=localStorage.getItem(ACCOUNTING_EMAIL_KEY)||'';refreshReport();$('reportDialog').showModal()};$('closeReport').onclick=()=>$('reportDialog').close();
-$('reportCompany').onchange=()=>{const rates=savedRates();$('hourlyRate').value=rates[$('reportCompany').value]||'';refreshReport()};
-$('reportMonth').oninput=refreshReport;$('hourlyRate').oninput=()=>{saveRate($('reportCompany').value,$('hourlyRate').value);refreshReport()};
-$('accountingEmail').onchange=()=>localStorage.setItem(ACCOUNTING_EMAIL_KEY,$('accountingEmail').value.trim());
-$('printReportBtn').onclick=()=>{refreshReport();document.body.classList.add('print-report');window.print()}
-$('exportCsvBtn').onclick=()=>{const rows=reportRows(),head=['N°','Date','Société','Matériel','Marque','Modèle','Série','Travaux','Heures','Pièces HT'];const lines=[head,...rows.map(r=>[num(r),frDate(r.departure||r.arrival),r.company,r.equipment,r.brand,r.model,r.serial,r.repair||r.diagnostic||r.fault,Number(r.hours)||0,(r.orders||[]).filter(o=>o.orderStatus!=='Annulée').reduce((s,o)=>s+orderTotal(o),0)])];const blob=new Blob(['\ufeff'+lines.map(r=>r.map(csvCell).join(';')).join('\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`recap-${slug($('reportCompany').value)}-${$('reportMonth').value}.csv`;a.click();URL.revokeObjectURL(a.href)}
-async function shareReport(){const text=reportText(),title=`Justeau SAV — ${$('reportCompany').value} — ${$('reportMonth').value}`;try{if(navigator.share){await navigator.share({title,text})}else if(navigator.clipboard){await navigator.clipboard.writeText(text);alert('Récapitulatif copié. Vous pouvez le coller dans un e-mail.')}else{prompt('Copiez le récapitulatif :',text)}}catch(e){if(e?.name!=='AbortError')alert('Partage impossible sur cet appareil. Utilisez « Envoyer par mail ».')}}
-function emailReport(){const email=$('accountingEmail').value.trim();if(email)localStorage.setItem(ACCOUNTING_EMAIL_KEY,email);const subject=`Justeau SAV - Récap ${$('reportCompany').value} - ${$('reportMonth').value}`,body=reportText();location.href=`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;}
-$('shareReportBtn').onclick=shareReport;$('emailReportBtn').onclick=emailReport;
-$('mechanic').onchange=()=>showMechanicOther($('mechanic').value==='__other__');
-$('saveMechanicBtn').onclick=()=>{const name=$('newMechanicName').value.trim();if(!name){alert('Saisissez un nom.');return;}const extra=savedMechanics();extra.push(name);localStorage.setItem(MECHANICS_KEY,JSON.stringify([...new Set(extra)]));rebuildMechanics(name);$('newMechanicName').value='';showMechanicOther(false);};
-async function shareApp(){const shareData={title:'Justeau SAV',text:'Application Justeau SAV — suivi des réparations atelier',url:location.origin+location.pathname};try{if(navigator.share){await navigator.share(shareData)}else if(navigator.clipboard){await navigator.clipboard.writeText(shareData.url);alert('Lien de l’application copié. Vous pouvez maintenant le coller dans un SMS ou un e-mail.')}else{prompt('Copiez ce lien :',shareData.url)}}catch(e){if(e?.name!=='AbortError')prompt('Copiez ce lien :',shareData.url)}}
-$('shareBtn').onclick=shareApp;$('shareMenuBtn').onclick=shareApp;
-$('lateRepairsBtn').onclick=()=>{$('statusFilter').value='';$('q').value='';render();const first=data.filter(isLateRepair).sort((a,b)=>(a.arrival||'').localeCompare(b.arrival||''))[0];if(first)editRepair(first.id);else alert('Aucune réparation en retard.')};
-$('lateOrdersBtn').onclick=()=>{$('ordersStatusFilter').value='';$('ordersSupplierFilter').value='';$('ordersCompanyFilter').value='';refreshGlobalOrders();$('ordersDialog').showModal()};
-$('noDiagnosisBtn').onclick=()=>{const first=data.find(r=>!['Réparé','HS'].includes(r.status)&&!(r.diagnostic||'').trim());if(first)editRepair(first.id);else alert('Tous les dossiers actifs ont un diagnostic.')};
-$('menuBtn').onclick=()=>$('menuDialog').showModal();$('closeMenu').onclick=()=>$('menuDialog').close();$('exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify({version:6,exportedAt:new Date().toISOString(),repairs:data},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`sauvegarde-justeau-sav-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)}
-$('importFile').onchange=async e=>{try{const obj=JSON.parse(await e.target.files[0].text()),rows=Array.isArray(obj)?obj:obj.repairs;if(!Array.isArray(rows))throw 0;if(!confirm(`Importer ${rows.length} réparation(s) ?`))return;await clearStore();for(const r of rows)await put(r);await reload();$('menuDialog').close()}catch{alert('Fichier non valide')}e.target.value=''}
-;(async()=>{rebuildMechanics('Gaetan');await openDB();await migrate();await reload();$('reportMonth').value=new Date().toISOString().slice(0,7);$('accountingEmail').value=localStorage.getItem(ACCOUNTING_EMAIL_KEY)||'';if('serviceWorker'in navigator)navigator.serviceWorker.register('service-worker.js')})()
+async function boot(){
+  if(!initSupabase())return;
+  const {data:{session}}=await sb.auth.getSession();
+  if(session)await enterApp(session.user);
+  sb.auth.onAuthStateChange(async(_event,session)=>{if(session?.user&&!currentUser)await enterApp(session.user);if(!session){showAuth()}})
+}
+function showAuth(){$('appPanel').hidden=true;$('authPanel').hidden=false;$('logoutBtn').hidden=true;$('shareBtn').hidden=true;$('roleBadge').hidden=true;currentUser=currentProfile=null}
+async function login(){
+  const email=$('email').value.trim(),password=$('password').value;
+  const {error}=await sb.auth.signInWithPassword({email,password});
+  if(error)alert('Connexion impossible : '+error.message);
+}
+async function logout(){await sb.auth.signOut()}
+async function enterApp(user){
+  currentUser=user;
+  const {data:p,error}=await sb.from('profiles').select('*').eq('id',user.id).single();
+  if(error||!p){alert('Votre compte existe mais aucun profil Justeau SAV n’est configuré. Demandez au gestionnaire de vous créer dans la table profiles.');await sb.auth.signOut();return}
+  currentProfile=p;
+  $('authPanel').hidden=true;$('appPanel').hidden=false;$('logoutBtn').hidden=false;$('shareBtn').hidden=false;$('roleBadge').hidden=false;
+  $('roleBadge').textContent=isManager()?'GESTIONNAIRE':'MÉCANICIEN';
+  document.querySelectorAll('.manager-only').forEach(el=>el.hidden=!isManager());
+  $('repairHeading').textContent=isManager()?'Réparations atelier':'Mes réparations';
+  $('repairSubheading').textContent=isManager()?'Toutes les fiches de l’atelier':'Fiches qui vous sont attribuées';
+  $('partsHeading').textContent=isManager()?'Commandes à faire':'Mes demandes de pièces';
+  await reloadAll(); subscribeRealtime();
+}
+async function reloadAll(){
+  await Promise.all([loadProfiles(),loadRepairs(),loadParts()]);
+  renderAll();
+}
+async function loadProfiles(){
+  const {data,error}=await sb.from('profiles').select('*').order('full_name');
+  if(error)throw error;profiles=data||[];
+}
+async function loadRepairs(){
+  let q=sb.from('repairs').select('*').order('created_at',{ascending:false});
+  if(!isManager())q=q.eq('assigned_to',currentUser.id);
+  const {data,error}=await q;if(error)throw error;repairs=data||[];
+}
+async function loadParts(){
+  let q=sb.from('part_requests').select('*').order('created_at',{ascending:false});
+  if(!isManager())q=q.eq('requested_by',currentUser.id);
+  const {data,error}=await q;if(error)throw error;parts=data||[];
+}
+function subscribeRealtime(){
+  realtimeChannels.forEach(c=>sb.removeChannel(c));realtimeChannels=[];
+  ['repairs','part_requests','profiles'].forEach(table=>{
+    const c=sb.channel('v7-'+table).on('postgres_changes',{event:'*',schema:'public',table},async()=>{await reloadAll()}).subscribe();
+    realtimeChannels.push(c);
+  });
+}
+function renderAll(){renderRepairs();renderParts();renderWorkshop();renderTeam();refreshReport();fillMechanics()}
+function renderRepairs(){
+  const q=$('repairSearch').value.trim().toLowerCase(),st=$('repairStatusFilter').value,pr=$('repairPriorityFilter').value;
+  let rows=repairs.filter(r=>!st||r.status===st).filter(r=>!pr||r.priority===pr).filter(r=>JSON.stringify(r).toLowerCase().includes(q));
+  $('repairCount').textContent=rows.length;$('urgentCount').textContent=rows.filter(r=>r.priority==='Urgent'&&r.status!=='Réparé').length;$('doneCount').textContent=rows.filter(r=>r.status==='Réparé').length;
+  const visibleRepairIds=new Set(rows.map(r=>r.id));$('openPartsCount').textContent=parts.filter(p=>visibleRepairIds.has(p.repair_id)&&!['Reçue','Annulée'].includes(p.status)).length;
+  $('repairList').innerHTML=rows.length?rows.map(r=>`<article class="card priority-${slug(r.priority)}">
+    <div class="card-head"><div><div class="number">${repairNo(r)}</div><h3>${esc(r.equipment)}</h3><div class="meta">${esc(r.company)} · ${esc([r.brand,r.model].filter(Boolean).join(' '))}${r.serial?' · '+esc(r.serial):''}${r.machine_hours!=null?' · Compteur '+esc(r.machine_hours)+' h':''}</div></div><div><span class="badge ${r.priority==='Urgent'?'urgent':''}">${esc(r.priority)}</span></div></div>
+    <p><strong>Panne :</strong> ${esc(r.fault)}</p>
+    <div class="meta">Mécanicien : <strong>${esc(profileName(r.assigned_to))}</strong> · Statut : ${esc(r.status)} · Arrivée : ${frDate(r.arrival_date)}</div>
+    <div class="actions"><button class="secondary" onclick="openRepair('${r.id}')">Ouvrir</button></div>
+  </article>`).join(''):'<div class="panel">Aucune réparation trouvée.</div>';
+}
+function fillMechanics(){
+  const sel=$('assignedTo'),current=sel.value;
+  const mechanics=profiles.filter(p=>p.active&&(p.role==='mechanic'||p.role==='manager'));
+  sel.innerHTML='<option value="">Non attribué</option>'+mechanics.map(p=>`<option value="${p.id}">${esc(p.full_name)}</option>`).join('');
+  if(current)sel.value=current;
+}
+function newRepair(){
+  if(!isManager())return;
+  currentRepair=null;$('repairForm').reset();$('repairId').value='';$('repairNoLabel').textContent='Nouveau dossier';$('arrivalDate').value=new Date().toISOString().slice(0,10);$('priority').value='Normale';$('repairStatus').value='En attente';fillMechanics();renderRepairParts();$('repairDialog').showModal();
+}
+window.openRepair=async id=>{
+  const r=repairs.find(x=>x.id===id);if(!r)return;currentRepair=r;
+  $('repairId').value=r.id;$('repairNoLabel').textContent=repairNo(r);
+  ['company','equipment','brand','model','serial','fault','diagnostic','repair_done','notes'].forEach(k=>{const map={repair_done:'repairDone'};$(map[k]||k).value=r[k]||''});$('machineHours').value=(r.machine_hours??'');
+  $('arrivalDate').value=r.arrival_date||'';$('departureDate').value=r.departure_date||'';$('hours').value=r.hours||'';$('priority').value=r.priority||'Normale';$('repairStatus').value=r.status||'En attente';fillMechanics();$('assignedTo').value=r.assigned_to||'';
+  const editable=isManager()||r.assigned_to===currentUser.id;
+  document.querySelectorAll('#repairForm input,#repairForm textarea,#repairForm select').forEach(el=>el.disabled=!editable&&el.id!=='repairId');
+  if(!isManager()){$('assignedTo').disabled=true;$('priority').disabled=true;$('company').disabled=true}
+  renderRepairParts();$('repairDialog').showModal();
+}
+async function saveRepair(e){
+  e.preventDefault();
+  const id=$('repairId').value||crypto.randomUUID();
+  const payload={id,company:$('company').value,equipment:$('equipment').value.trim(),brand:$('brand').value.trim(),model:$('model').value.trim(),serial:$('serial').value.trim(),machine_hours:$('machineHours').value===''?null:Number($('machineHours').value),fault:$('fault').value.trim(),arrival_date:$('arrivalDate').value,diagnostic:$('diagnostic').value.trim(),repair_done:$('repairDone').value.trim(),hours:Number($('hours').value)||0,status:$('repairStatus').value,departure_date:$('departureDate').value||null,notes:$('notes').value.trim(),updated_by:currentUser.id};
+  if(isManager()){payload.priority=$('priority').value;payload.assigned_to=$('assignedTo').value||null;if(!currentRepair)payload.created_by=currentUser.id}
+  const {error}=await sb.from('repairs').upsert(payload);if(error)return alert('Enregistrement impossible : '+error.message);
+  $('repairDialog').close();toast('Réparation enregistrée');await reloadAll();
+}
+function renderRepairParts(){
+  if(!currentRepair){$('repairPartRequests').innerHTML='<div class="meta">Enregistrez d’abord la réparation pour ajouter une pièce.</div>';$('newPartRequestBtn').disabled=true;return}
+  $('newPartRequestBtn').disabled=false;
+  const rows=parts.filter(p=>p.repair_id===currentRepair.id);
+  $('repairPartRequests').innerHTML=rows.length?rows.map(p=>`<article class="card"><div class="card-head"><div><h3>${esc(p.designation)}</h3><div class="meta">${esc(p.supplier||'Fournisseur non renseigné')} · réf. ${esc(p.reference||'—')} · Qté ${p.quantity}</div></div><span class="badge ${p.urgency==='Urgent'?'urgent':''}">${esc(p.status)}</span></div><div class="actions"><button type="button" class="secondary" onclick="openPart('${p.id}')">Ouvrir</button></div></article>`).join(''):'<div class="meta">Aucune demande de pièce.</div>';
+}
+function newPart(){
+  if(!currentRepair)return;currentPartRepair=currentRepair;$('partForm').reset();$('partId').value='';$('partRepairLabel').textContent=repairNo(currentRepair)+' — '+currentRepair.equipment;$('partQty').value=1;$('partUrgency').value='Normal';$('partStatus').value=isManager()?'À commander':'À valider';$('partPhotoPreview').innerHTML='';$('partDialog').showModal();
+}
+window.openPart=async id=>{
+  const p=parts.find(x=>x.id===id);if(!p)return;currentPartRepair=repairs.find(r=>r.id===p.repair_id)||null;
+  $('partId').value=p.id;$('partRepairLabel').textContent=currentPartRepair?repairNo(currentPartRepair)+' — '+currentPartRepair.equipment:'';
+  $('supplier').value=p.supplier||'';$('partReference').value=p.reference||'';$('partName').value=p.designation||'';$('partQty').value=p.quantity||1;$('partUrgency').value=p.urgency||'Normal';$('partStatus').value=p.status||'À valider';$('partUnitPrice').value=p.unit_price||'';$('partOrderDate').value=p.order_date||'';$('partReceivedDate').value=p.received_date||'';$('partOrderNo').value=p.purchase_order_no||'';$('partComment').value=p.comment||'';
+  if(!isManager()){['partStatus','partUnitPrice','partOrderDate','partReceivedDate','partOrderNo'].forEach(id=>$(id).disabled=true)}else{['partStatus','partUnitPrice','partOrderDate','partReceivedDate','partOrderNo'].forEach(id=>$(id).disabled=false)}
+  $('partPhotoPreview').innerHTML='';
+  if(p.photo_path){const {data}=await sb.storage.from('parts-photos').createSignedUrl(p.photo_path,3600);if(data?.signedUrl)$('partPhotoPreview').innerHTML=`<img src="${data.signedUrl}" alt="Photo pièce">`}
+  $('partDialog').showModal();
+}
+async function savePart(e){
+  e.preventDefault();if(!currentPartRepair)return;
+  const id=$('partId').value||crypto.randomUUID();
+  let photoPath=parts.find(x=>x.id===id)?.photo_path||null;
+  const file=$('partPhoto').files[0];
+  if(file){const ext=(file.name.split('.').pop()||'jpg').toLowerCase(),path=`${currentPartRepair.id}/${id}.${ext}`;const {error:upErr}=await sb.storage.from('parts-photos').upload(path,file,{upsert:true});if(upErr)return alert('Photo non envoyée : '+upErr.message);photoPath=path}
+  const payload={id,repair_id:currentPartRepair.id,requested_by:parts.find(x=>x.id===id)?.requested_by||currentUser.id,supplier:$('supplier').value.trim(),reference:$('partReference').value.trim(),designation:$('partName').value.trim(),quantity:Number($('partQty').value)||1,urgency:$('partUrgency').value,comment:$('partComment').value.trim(),photo_path:photoPath,updated_by:currentUser.id};
+  if(isManager()){payload.status=$('partStatus').value;payload.unit_price=Number($('partUnitPrice').value)||0;payload.order_date=$('partOrderDate').value||null;payload.received_date=$('partReceivedDate').value||null;payload.purchase_order_no=$('partOrderNo').value.trim()}else if(!$('partId').value){payload.status='À valider'}
+  const {error}=await sb.from('part_requests').upsert(payload);if(error)return alert('Demande impossible : '+error.message);
+  $('partDialog').close();toast('Demande de pièce enregistrée');await reloadAll();renderRepairParts();
+}
+function renderParts(){
+  const q=$('partSearch').value.trim().toLowerCase(),st=$('partStatusFilter').value,ur=$('partUrgencyFilter').value;
+  let rows=parts.filter(p=>!st||p.status===st).filter(p=>!ur||p.urgency===ur).filter(p=>JSON.stringify(p).toLowerCase().includes(q)||profileName(p.requested_by).toLowerCase().includes(q));
+  $('partList').innerHTML=rows.length?rows.map(p=>{const r=repairs.find(x=>x.id===p.repair_id);return `<article class="card ${p.urgency==='Urgent'?'priority-urgent':''}"><div class="card-head"><div><div class="number">${r?repairNo(r):''}</div><h3>${esc(p.designation)}</h3><div class="meta">${esc(p.supplier||'Fournisseur à préciser')} · réf. ${esc(p.reference||'—')} · Qté ${p.quantity}</div></div><span class="badge ${p.urgency==='Urgent'?'urgent':''}">${esc(p.status)}</span></div><div class="meta">${r?esc(r.company)+' · '+esc(r.equipment):''} · demandé par <strong>${esc(profileName(p.requested_by))}</strong></div><div class="actions"><button class="secondary" onclick="openPart('${p.id}')">Ouvrir</button></div></article>`}).join(''):'<div class="panel">Aucune demande de pièce.</div>';
+}
+function renderWorkshop(){
+  if(!isManager())return;
+  const priorities=['Urgent','Haute','Normale','Basse'];
+  $('workshopBoard').innerHTML=priorities.map(pr=>{const rows=repairs.filter(r=>r.priority===pr&&!['Réparé','HS'].includes(r.status));return `<section class="kanban-col"><h3>${pr} (${rows.length})</h3>${rows.map(r=>`<article class="card priority-${slug(pr)}"><div class="number">${repairNo(r)}</div><strong>${esc(r.equipment)}</strong><div class="meta">${esc(profileName(r.assigned_to))}<br>${esc(r.status)}</div><button class="secondary" onclick="openRepair('${r.id}')">Ouvrir</button></article>`).join('')||'<div class="meta">Aucun dossier</div>'}</section>`}).join('');
+}
+function renderTeam(){
+  if(!isManager())return;
+  $('teamList').innerHTML=profiles.map(p=>`<article class="card"><div class="card-head"><div><h3>${esc(p.full_name||'Sans nom')}</h3><div class="meta">${esc(p.email||'')} · ${p.role==='manager'?'Gestionnaire':'Mécanicien'} · ${p.active?'Actif':'Inactif'}</div></div><button class="secondary" onclick="editProfile('${p.id}')">Modifier</button></div></article>`).join('');
+}
+window.editProfile=id=>{const p=profiles.find(x=>x.id===id);if(!p)return;$('profileId').value=p.id;$('profileName').value=p.full_name||'';$('profileRole').value=p.role||'mechanic';$('profileActive').value=String(p.active!==false);$('profileDialog').showModal()}
+async function saveProfile(e){e.preventDefault();const {error}=await sb.from('profiles').update({full_name:$('profileName').value.trim(),role:$('profileRole').value,active:$('profileActive').value==='true'}).eq('id',$('profileId').value);if(error)return alert(error.message);$('profileDialog').close();await reloadAll()}
+function reportRowsForCompany(company){
+  const m=$('reportMonth').value;
+  return repairs.filter(r=>r.company===company&&(r.departure_date||r.arrival_date||'').slice(0,7)===m);
+}
+function companyReport(company){
+  const rows=reportRowsForCompany(company),rate=Number($('hourlyRate').value)||0;
+  const totalHours=rows.reduce((s,r)=>s+(Number(r.hours)||0),0),ids=new Set(rows.map(r=>r.id));
+  const validParts=parts.filter(p=>ids.has(p.repair_id)&&!['Annulée','À valider'].includes(p.status));
+  const partsTotal=validParts.reduce((s,p)=>s+(Number(p.unit_price)||0)*(Number(p.quantity)||0),0),labor=rate*totalHours;
+  return {company,rows,totalHours,partsTotal,labor,total:partsTotal+labor,validParts};
+}
+function refreshReport(){
+  if(!isManager())return;
+  const reports=ACCOUNTING_COMPANIES.map(companyReport);
+  const totalInterventions=reports.reduce((s,x)=>s+x.rows.length,0),totalHours=reports.reduce((s,x)=>s+x.totalHours,0),totalParts=reports.reduce((s,x)=>s+x.partsTotal,0),totalLabor=reports.reduce((s,x)=>s+x.labor,0),totalGrand=totalParts+totalLabor;
+  $('reportInterventions').textContent=totalInterventions;$('reportHours').textContent=hoursLabel(totalHours);$('reportParts').textContent=money(totalParts);$('reportLabor').textContent=money(totalLabor);$('reportGrand').textContent=money(totalGrand);
+  $('companyReportBlocks').innerHTML=reports.map(x=>`<section class="company-report"><h3>${esc(x.company)}</h3><div class="company-totals"><article><span>Interventions</span><strong>${x.rows.length}</strong></article><article><span>Total heures</span><strong>${hoursLabel(x.totalHours)}</strong></article><article><span>Pièces HT</span><strong>${money(x.partsTotal)}</strong></article><article><span>Main-d’œuvre HT</span><strong>${money(x.labor)}</strong></article></div><div class="table-wrap"><table><thead><tr><th>N°</th><th>Date</th><th>Matériel</th><th>Compteur</th><th>Mécanicien</th><th>Heures</th><th>Pièces HT</th></tr></thead><tbody>${x.rows.map(r=>{const rp=x.validParts.filter(p=>p.repair_id===r.id),pc=rp.reduce((s,p)=>s+(Number(p.unit_price)||0)*(Number(p.quantity)||0),0);return `<tr><td>${repairNo(r)}</td><td>${frDate(r.departure_date||r.arrival_date)}</td><td>${esc(r.equipment)}</td><td>${r.machine_hours!=null?esc(r.machine_hours)+' h':'—'}</td><td>${esc(profileName(r.assigned_to))}</td><td>${hoursLabel(r.hours)}</td><td>${money(pc)}</td></tr>`}).join('')}</tbody></table></div></section>`).join('');
+  return {reports,totalInterventions,totalHours,totalParts,totalLabor,totalGrand,month:$('reportMonth').value};
+}
+function reportText(){
+  const x=refreshReport();let text=`JUSTEAU SAV — RÉCAPITULATIF MENSUEL\nMois : ${x.month}\n\n`;
+  x.reports.forEach(r=>{text+=`${r.company}\nInterventions : ${r.rows.length}\nTotal heures : ${hoursLabel(r.totalHours)}\nPièces HT : ${money(r.partsTotal)}\n`;if((Number($('hourlyRate').value)||0)>0)text+=`Main-d’œuvre HT : ${money(r.labor)}\n`;text+='\n'});
+  text+=`TOTAL GÉNÉRAL\nInterventions : ${x.totalInterventions}\nHeures : ${hoursLabel(x.totalHours)}\nPièces HT : ${money(x.totalParts)}\n`;if((Number($('hourlyRate').value)||0)>0)text+=`Main-d’œuvre HT : ${money(x.totalLabor)}\n`;text+=`TOTAL HT : ${money(x.totalGrand)}`;return text;
+}
+async function shareReport(){const text=reportText();if(navigator.share)await navigator.share({title:'Justeau SAV — Récap mensuel',text});else if(navigator.clipboard){await navigator.clipboard.writeText(text);toast('Récapitulatif copié')}}
+function emailReport(){const x=refreshReport(),subject=`Justeau SAV - Récapitulatif ${x.month} - Justeau Frères / SECA / SAS Havard`,body=reportText();location.href=`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}
+async function shareApp(){const data={title:'Justeau SAV',text:'Application Justeau SAV',url:location.origin+location.pathname};if(navigator.share)await navigator.share(data);else if(navigator.clipboard){await navigator.clipboard.writeText(data.url);toast('Lien copié')}}
+function switchView(name){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===name));$('view-'+name).classList.add('active');if(name==='report')refreshReport()}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchView(t.dataset.view));
+$('saveServerBtn').onclick=saveServer;$('clearServerBtn').onclick=clearServer;$('loginBtn').onclick=login;$('logoutBtn').onclick=logout;$('shareBtn').onclick=shareApp;
+$('newRepairBtn').onclick=newRepair;$('repairForm').onsubmit=saveRepair;$('closeRepairDialog').onclick=()=>$('repairDialog').close();$('newPartRequestBtn').onclick=newPart;$('partForm').onsubmit=savePart;$('closePartDialog').onclick=()=>$('partDialog').close();$('profileForm').onsubmit=saveProfile;$('closeProfileDialog').onclick=()=>$('profileDialog').close();
+['repairSearch','repairStatusFilter','repairPriorityFilter'].forEach(id=>$(id).oninput=renderRepairs);['partSearch','partStatusFilter','partUrgencyFilter'].forEach(id=>$(id).oninput=renderParts);['reportMonth','hourlyRate'].forEach(id=>$(id).oninput=refreshReport);
+$('printReportBtn').onclick=()=>window.print();$('shareReportBtn').onclick=shareReport;$('emailReportBtn').onclick=emailReport;
+$('reportMonth').value=new Date().toISOString().slice(0,7);
+boot();
