@@ -111,7 +111,13 @@ async function saveRepair(e){
   const id=$('repairId').value||crypto.randomUUID();
   const payload={id,company:$('company').value,equipment:$('equipment').value.trim(),brand:$('brand').value.trim(),model:$('model').value.trim(),serial:$('serial').value.trim(),machine_hours:$('machineHours').value===''?null:Number($('machineHours').value),fault:$('fault').value.trim(),arrival_date:$('arrivalDate').value,diagnostic:$('diagnostic').value.trim(),repair_done:$('repairDone').value.trim(),hours:Number($('hours').value)||0,status:$('repairStatus').value,departure_date:$('departureDate').value||null,notes:$('notes').value.trim(),updated_by:currentUser.id};
   if(isManager()){payload.priority=$('priority').value;payload.assigned_to=$('assignedTo').value||null;if(!currentRepair)payload.created_by=currentUser.id}
-  const {error}=await sb.from('repairs').upsert(payload);if(error)return alert('Enregistrement impossible : '+error.message);
+  let error;
+  if(currentRepair){
+    ({error}=await sb.from('repairs').update(payload).eq('id',id));
+  }else{
+    ({error}=await sb.from('repairs').insert(payload));
+  }
+  if(error)return alert('Enregistrement impossible : '+error.message);
   $('repairDialog').close();toast('Réparation enregistrée');await reloadAll();
 }
 function renderRepairParts(){
@@ -140,7 +146,13 @@ async function savePart(e){
   if(file){const ext=(file.name.split('.').pop()||'jpg').toLowerCase(),path=`${currentPartRepair.id}/${id}.${ext}`;const {error:upErr}=await sb.storage.from('parts-photos').upload(path,file,{upsert:true});if(upErr)return alert('Photo non envoyée : '+upErr.message);photoPath=path}
   const payload={id,repair_id:currentPartRepair.id,requested_by:parts.find(x=>x.id===id)?.requested_by||currentUser.id,supplier:$('supplier').value.trim(),reference:$('partReference').value.trim(),designation:$('partName').value.trim(),quantity:Number($('partQty').value)||1,urgency:$('partUrgency').value,comment:$('partComment').value.trim(),photo_path:photoPath,updated_by:currentUser.id};
   if(isManager()){payload.status=$('partStatus').value;payload.unit_price=Number($('partUnitPrice').value)||0;payload.order_date=$('partOrderDate').value||null;payload.received_date=$('partReceivedDate').value||null;payload.purchase_order_no=$('partOrderNo').value.trim()}else if(!$('partId').value){payload.status='À valider'}
-  const {error}=await sb.from('part_requests').upsert(payload);if(error)return alert('Demande impossible : '+error.message);
+  let error;
+  if($('partId').value){
+    ({error}=await sb.from('part_requests').update(payload).eq('id',id));
+  }else{
+    ({error}=await sb.from('part_requests').insert(payload));
+  }
+  if(error)return alert('Demande impossible : '+error.message);
   $('partDialog').close();toast('Demande de pièce enregistrée');await reloadAll();renderRepairParts();
 }
 function renderParts(){
