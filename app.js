@@ -93,8 +93,29 @@ function fillMechanics(){
   if(current)sel.value=current;
 }
 function newRepair(){
-  if(!isManager())return;
-  currentRepair=null;$('repairForm').reset();$('repairId').value='';$('repairNoLabel').textContent='Nouveau dossier';$('arrivalDate').value=new Date().toISOString().slice(0,10);$('priority').value='Normale';$('repairStatus').value='En attente';fillMechanics();renderRepairParts();$('repairDialog').showModal();
+  currentRepair=null;
+  $('repairForm').reset();
+  $('repairId').value='';
+  $('repairNoLabel').textContent='Nouvelle intervention';
+  $('arrivalDate').value=new Date().toISOString().slice(0,10);
+  $('priority').value='Normale';
+  $('repairStatus').value='En attente';
+  fillMechanics();
+
+  // Réactive les champs qui ont pu être verrouillés lors de l'ouverture d'une fiche.
+  document.querySelectorAll('#repairForm input,#repairForm textarea,#repairForm select').forEach(el=>el.disabled=false);
+
+  if(isManager()){
+    $('assignedTo').value='';
+  }else{
+    // Une intervention créée par un mécanicien lui est automatiquement attribuée.
+    $('assignedTo').value=currentUser.id;
+    $('assignedTo').disabled=true;
+    $('priority').disabled=true;
+  }
+
+  renderRepairParts();
+  $('repairDialog').showModal();
 }
 window.openRepair=async id=>{
   const r=repairs.find(x=>x.id===id);if(!r)return;currentRepair=r;
@@ -110,7 +131,16 @@ async function saveRepair(e){
   e.preventDefault();
   const id=$('repairId').value||crypto.randomUUID();
   const payload={id,company:$('company').value,equipment:$('equipment').value.trim(),brand:$('brand').value.trim(),model:$('model').value.trim(),serial:$('serial').value.trim(),machine_hours:$('machineHours').value===''?null:Number($('machineHours').value),fault:$('fault').value.trim(),arrival_date:$('arrivalDate').value,diagnostic:$('diagnostic').value.trim(),repair_done:$('repairDone').value.trim(),hours:Number($('hours').value)||0,status:$('repairStatus').value,departure_date:$('departureDate').value||null,notes:$('notes').value.trim(),updated_by:currentUser.id};
-  if(isManager()){payload.priority=$('priority').value;payload.assigned_to=$('assignedTo').value||null;if(!currentRepair)payload.created_by=currentUser.id}
+  if(isManager()){
+    payload.priority=$('priority').value;
+    payload.assigned_to=$('assignedTo').value||null;
+    if(!currentRepair)payload.created_by=currentUser.id;
+  }else if(!currentRepair){
+    // Le mécanicien peut créer une fiche uniquement pour lui-même.
+    payload.priority='Normale';
+    payload.assigned_to=currentUser.id;
+    payload.created_by=currentUser.id;
+  }
   let error;
   if(currentRepair){
     ({error}=await sb.from('repairs').update(payload).eq('id',id));
